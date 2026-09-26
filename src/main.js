@@ -33,6 +33,7 @@ import { StreetProps, loadVehicleGeometry } from "./legacy/props.js";
 import { MapColliders } from "./legacy/collision.js";
 import { Soundscape } from "./legacy/audio.js";
 import { Atmosphere, Rain } from "./environment.js";
+import { repairPacificRoof } from "./roof-repair.js";
 import { PLACES } from "./places.js";
 import { ShadowBudget } from "./performance.js";
 import { Explorer } from "./controller.js";
@@ -569,6 +570,7 @@ async function start() {
       materials[name] = atmosphere.material(name, maps[0], maps[1]);
     }),
   );
+  repairPacificRoof(gltf.scene);
   const solidMeshes = [],
     buildings = [];
   gltf.scene.traverse((o) => {

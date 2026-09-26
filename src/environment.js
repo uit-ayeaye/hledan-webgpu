@@ -117,9 +117,12 @@ export class Rain {
       side: THREE.DoubleSide,
     });
     mat.positionNode = positions.toAttribute();
-    mat.scaleNode = vec2(0.07, 2.8);
+    mat.scaleNode = vec2(0.014, 0.48);
+    // Suppress close-to-lens streaks instead of letting perspective turn them into rods.
+    const rainDistance = positions.toAttribute().sub(this.center).length();
     mat.opacityNode = this.amount
-      .mul(0.34)
+      .mul(0.2)
+      .mul(smoothstep(2, 7, rainDistance))
       .mul(float(1).sub(uv().y.sub(0.5).abs().mul(2)))
       .mul(float(1).sub(uv().x.sub(0.5).abs().mul(2)));
     const geo = new THREE.PlaneGeometry(1, 1);
@@ -133,7 +136,7 @@ export class Rain {
     for (let i = 0; i < 900; i++) {
       const x = ((i * 137.508) % 900) - 450,
         z = ((i * 293.317) % 1300) - 450;
-      splashPositions.set([x, (solids.topAt(x, z) ?? 40) + 0.06, z], i * 3);
+      splashPositions.set([x, (solids.topAt(x, z) ?? 40) + 0.012, z], i * 3);
     }
     const splashMat = new THREE.MeshBasicNodeMaterial({
       color: 0xb9d0cb,
@@ -143,7 +146,7 @@ export class Rain {
     });
     const phase = this.clock.mul(1.7).add(hash(instanceIndex)).fract();
     splashMat.positionNode = positionLocal
-      .mul(phase.mul(2).add(0.2))
+      .mul(phase.mul(0.24).add(0.035))
       .add(
         instancedBufferAttribute(
           new THREE.InstancedBufferAttribute(splashPositions, 3),
@@ -154,9 +157,9 @@ export class Rain {
       .mul(float(1).sub(smoothstep(0.42, 0.49, radius)))
       .mul(float(1).sub(phase))
       .mul(this.amount)
-      .mul(0.55);
+      .mul(0.2);
     this.splashes = new THREE.Mesh(
-      new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2),
+      new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
       splashMat,
     );
     this.splashes.count = 900;

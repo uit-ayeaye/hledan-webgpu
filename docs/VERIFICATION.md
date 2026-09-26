@@ -1,5 +1,11 @@
 # Rendering rebuild verification — 26 September 2026
 
+## Rain and Pacific Tower roof correction
+
+- Rain streak size reduced from 0.07 × 2.8 to 0.014 × 0.48 map units, with lower opacity and a near-camera fade. Splash planes now expand only to 0.275 map units (about 18 cm), instead of 4.4 map units (almost 3 m), with softer opacity and an 8 mm surface offset.
+- Pacific Tower's two cap surfaces contained inconsistent winding and overlapping fan triangles. Reconstructed their interiors from the existing welded boundary loops with ear clipping, preserving all original facade vertices/attributes. The upper cap changes from 202 to 36 triangles; the lower cap remains 50 correctly triangulated faces. Original GLB is preserved; the repair runs before rendering and collision construction.
+- 14 tests pass, including a regression check for original-attribute preservation, upward triangle winding and cap areas matching their outlines. Production build passes. Local WebGPU rain/roof overview renders without warning/error logs.
+
 ## Version 2.1 — street detail and exploration
 
 - `npm test`: 13 passing tests. Added checks for finite/complete detail geometry, physical proportions, real-map waypoint clearance, consistent walking across 30/60/144 Hz render rates, mode-switch position preservation, gravity while UI is focused, and bounded shadow scheduling.

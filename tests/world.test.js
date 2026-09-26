@@ -318,3 +318,52 @@ test("walking stays consistent at 30/60/144 FPS and preserves position through m
     globalThis.window = savedWindow;
   }
 });
+
+import { repairPacificRoof } from "../src/roof-repair.js";
+test("Pacific roof caps triangulate without overlap or reversed winding and preserve the facade", async () => {
+  const b = readFileSync(
+    new URL("../public/models/hledan.glb", import.meta.url),
+  );
+  const { scene } = await new GLTFLoader().parseAsync(
+    b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength),
+    "",
+  );
+  const mesh = scene.getObjectByName("Buildings"),
+    original = mesh.geometry;
+  const stats = repairPacificRoof(scene),
+    g = mesh.geometry,
+    p = g.attributes.position;
+  assert.deepEqual(
+    stats.map((s) => s.before),
+    [50, 202],
+  );
+  assert.deepEqual(
+    stats.map((s) => s.after),
+    [50, 36],
+  );
+  // Original vertices and attributes remain exact: only indices of the two caps change.
+  for (const [name, a] of Object.entries(original.attributes))
+    for (let i = 0; i < a.count; i++)
+      for (let j = 0; j < a.itemSize; j++)
+        assert.equal(
+          g.attributes[name].getComponent(i, j),
+          a.getComponent(i, j),
+        );
+  const start = g.index.count - stats.reduce((n, s) => n + s.after * 3, 0);
+  let area = 0;
+  for (let i = start; i < g.index.count; i += 3) {
+    const a = g.index.getX(i),
+      b = g.index.getX(i + 1),
+      c = g.index.getX(i + 2);
+    const signed =
+      ((p.getZ(b) - p.getZ(a)) * (p.getX(c) - p.getX(a)) -
+        (p.getX(b) - p.getX(a)) * (p.getZ(c) - p.getZ(a))) /
+      2;
+    assert.ok(signed > 0, "each new triangle faces up");
+    area += signed;
+  }
+  assert.ok(
+    Math.abs(area - (785.8823 + 1536.2832)) < 0.1,
+    "total area equals the two outlines, with no overlapping fan area",
+  );
+});
