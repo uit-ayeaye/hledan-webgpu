@@ -1012,3 +1012,83 @@ dialog {
 .exploring .intro {
   display: none;
 }
+
+/* The neighbourhood remains reachable during a walk; its contents are optional. */
+.immersed .places {
+  display: block;
+}
+.places {
+  width: 260px;
+}
+.places-list {
+  max-height: min(67vh, 620px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.neighbourhood-map {
+  position: relative;
+  height: 210px;
+  margin: 0 0 12px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #202c27;
+  border: 1px solid #e3dab61c;
+}
+.neighbourhood-map img,
+.neighbourhood-map svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.neighbourhood-map span {
+  position: absolute;
+  bottom: 7px;
+  left: 10px;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: #ded9bd;
+}
+.map-stops {
+  fill: #e2c98a;
+  stroke: #202c27;
+  stroke-width: 4;
+}
+#map-player circle {
+  fill: #e4f5dd;
+  opacity: 0.12;
+}
+#map-player path {
+  fill: #f2f1d8;
+  stroke: #30473c;
+  stroke-width: 3;
+}
+#navigation-location {
+  font-size: 11px;
+  color: #dcd9c4;
+  margin: 0 0 16px;
+}
+@media (max-width: 700px) {
+  .places,
+  .immersed .places {
+    display: block;
+    top: 108px;
+    right: 20px;
+    bottom: auto;
+    width: 220px;
+  }
+  .places summary {
+    font-size: 10px;
+    padding: 10px 13px;
+  }
+  .places-list {
+    max-height: 45vh;
+  }
+  .neighbourhood-map {
+    height: 140px;
+  }
+  body:has(.places[open]) .intro {
+    visibility: hidden;
+  }
+}

@@ -59,3 +59,11 @@ Original map textures
 4K Building_Base, Environment_Base, Hledan_Centre and corresponding roughness
 maps from Thomas's original HLEDAN HIGH POLY Unity package. Transcoded to WebP.
 They retain the original map's rights and are not relicensed as CC0.
+
+Street-detail update (September 2026)
+-------------------------------------
+Procedural tea canopies, woven-fabric texture, stool frames, benches, crockery,
+and kettles are authored in this repository. They are illustrative props, not
+scans of a particular business. The neighbourhood SVG is generated from the
+original Hledan model by scripts/build-neighbourhood-map.mjs and retains its
+source map rights.

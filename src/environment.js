@@ -228,6 +228,37 @@ export class Atmosphere {
     scene.add(floor);
     this.envGenerator = new THREE.PMREMGenerator(renderer);
   }
+  focusShadows(camera) {
+    const p = camera.position;
+    const extent = p.y > 140 ? 420 : 160;
+    if (
+      this.shadowFocus &&
+      this.shadowFocus.distanceToSquared(p) < 16 &&
+      this.shadowExtent === extent
+    )
+      return false;
+    this.shadowFocus = p.clone();
+    this.shadowExtent = extent;
+    const c = this.sun.shadow.camera;
+    c.left = c.bottom = -extent;
+    c.right = c.top = extent;
+    c.updateProjectionMatrix();
+    // Snap in light space to whole shadow texels to keep static edges stable while moving.
+    const dir = this.sun.position
+      .clone()
+      .sub(this.sun.target.position)
+      .normalize();
+    const right = new THREE.Vector3(0, 1, 0).cross(dir).normalize();
+    const up = dir.clone().cross(right);
+    const target = new THREE.Vector3(p.x, 45, p.z);
+    const texel = (extent * 2) / this.sun.shadow.mapSize.x;
+    const x = target.dot(right),
+      y = target.dot(up);
+    target.addScaledVector(right, Math.round(x / texel) * texel - x);
+    target.addScaledVector(up, Math.round(y / texel) * texel - y);
+    this.sun.target.position.copy(target);
+    return true;
+  }
   async loadSurfaces(base) {
     const loader = new THREE.TextureLoader();
     this.surfaces = await Promise.all(

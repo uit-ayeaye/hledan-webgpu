@@ -25,7 +25,10 @@ Use a current desktop browser with WebGPU and hardware acceleration, over HTTPS 
 - HDR scene pass with packed normal/roughness and motion-vector buffers, GTAO, roughness-aware screen-space reflections, bloom and AgX tone mapping. High adds temporal anti-aliasing; Ultra adds half-resolution screen-space global illumination with temporal accumulation. Balanced keeps FXAA and GTAO.
 - 18,000 camera-local GPU rain particles: gravity, terminal velocity, wind and collision against a 128² height field of the actual map. 900 procedural surface ripple instances; restrained puddle coverage, wet material response, and stationary asphalt relief.
 - 18 moving vehicles on two measured flyover lanes; pedestrian braking and player collision against traffic, static props and map walls.
-- First-person walk with gravity, jump, step-up, floor/ceiling separation, swept horizontal substeps; fly and orbit modes. Pointer lock and drag-look fallback.
+- Rebuilt tea-shop geometry: sagging woven tarps, open stool legs and braces, serving benches, saucers, tea cups, milk tins and reflective kettles. Small crockery is culled beyond 100 map units (~67 m); furniture casts shadows.
+- Radially masked lamp halos replace square night-light sprites. Camera-following, texel-snapped directional shadows, refreshed at a bounded 12/20/30 Hz for Balanced/High/Ultra while the main scene continues rendering. Ultra filters both bounced light and occlusion with depth/normal rejection.
+- First-person movement simulated at 90 Hz with interpolated camera position, smooth step-up, gravity, jump, floor/ceiling separation and swept horizontal substeps. Walk/fly/orbit preserve position and viewing direction where a safe walking surface exists. Pointer lock and drag-look fallback; gravity continues when UI has focus.
+- A live neighbourhood map generated from the actual road/building mesh, with camera heading, nearest-landmark distance and walking waypoints. Press N to open it. `?place=tea&moment=golden` opens a shareable landmark view.
 - Positional/proximity procedural city soundscape, horns, tea-glass clinks, rain, and footsteps. Sound starts only on request.
 - Six weather presets (dawn, clear skies, golden hour, monsoon, blue hour, after dark), graphics tiers, adaptive resolution, manual exposure, time slider, day progression, persistent settings, guided orbit, photo capture, fullscreen, reduced-motion defaults and background suspension.
 - Original portfolio remains untouched. Map loading is separate from engine modules so future districts can be added.
@@ -41,7 +44,7 @@ Use a current desktop browser with WebGPU and hardware acceleration, over HTTPS 
 | Space         | Jump / fly up                 |
 | C             | Fly down                      |
 | Esc           | Release captured mouse        |
-| H / P / M     | Settings / photo mode / sound |
+| H / P / M / N | Settings / photo / sound / neighbourhood |
 
 ## Scope and limitations
 

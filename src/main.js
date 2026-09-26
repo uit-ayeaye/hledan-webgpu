@@ -2,6 +2,7 @@ import "./style.css";
 import * as THREE from "three/webgpu";
 import {
   pass,
+  Fn,
   vec4,
   vec3,
   float,
@@ -20,7 +21,7 @@ import {
   colorToDirection,
   sample,
 } from "three/tsl";
-import { HalfResolutionSSGI } from "./rendering.js";
+import { HalfResolutionSSGI, bilateralGI } from "./rendering.js";
 import { traa } from "three/addons/tsl/display/TRAANode.js";
 import { ssr } from "three/addons/tsl/display/SSRNode.js";
 import { bloom } from "three/addons/tsl/display/BloomNode.js";
@@ -32,6 +33,8 @@ import { StreetProps, loadVehicleGeometry } from "./legacy/props.js";
 import { MapColliders } from "./legacy/collision.js";
 import { Soundscape } from "./legacy/audio.js";
 import { Atmosphere, Rain } from "./environment.js";
+import { PLACES } from "./places.js";
+import { ShadowBudget } from "./performance.js";
 import { Explorer } from "./controller.js";
 import { Traffic } from "./traffic.js";
 import {
@@ -46,7 +49,11 @@ import {
 const $ = (id) => document.getElementById(id),
   settings = loadSettings();
 // A shared moment opens consistently without discarding the visitor's other preferences.
-const sharedMoment = new URLSearchParams(location.search).get("moment");
+const params = new URLSearchParams(location.search);
+const sharedMoment = params.get("moment");
+const sharedPlace = Object.hasOwn(PLACES, params.get("place"))
+  ? params.get("place")
+  : "centre";
 if (sharedMoment && Object.hasOwn(PRESETS, sharedMoment))
   Object.assign(settings, PRESETS[sharedMoment], { preset: sharedMoment });
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -85,12 +92,8 @@ let flyTo = null,
   screenShotPending = false,
   ready = false;
 const sound = new Soundscape("hi");
-const PLACES = {
-  junction: { position: [188, 214, 486], target: [-24, 58, 300] },
-  flyover: { position: [46, 86, 58], target: [-6, 64, 262] },
-  tea: { position: [130.5, 47.3, -269.5], target: [122, 45.3, -278] },
-  centre: { position: [-46, 52, 262], target: [-50, 90, 430] },
-};
+const shadowBudget = new ShadowBudget();
+
 function toast(text) {
   $("toast").textContent = text;
   $("toast").hidden = false;
@@ -161,6 +164,10 @@ function graphics() {
   atmosphere.sun.shadow.mapSize.set(size, size);
   atmosphere.sun.shadow.map?.dispose();
   atmosphere.sun.shadow.map = null;
+  atmosphere.sun.shadow.autoUpdate = false;
+  atmosphere.sun.shadow.needsUpdate = true;
+  shadowBudget.invalidate();
+  atmosphere.shadowFocus = null;
   scale = 1;
   resize();
   buildPipeline();
@@ -207,16 +214,24 @@ function buildPipeline() {
       viewNormal,
       camera,
     );
-    giPass.sliceCount.value = 1;
-    giPass.stepCount.value = 8;
+    giPass.sliceCount.value = 2;
+    giPass.stepCount.value = 6;
     giPass.radius.value = 16;
     giPass.thickness.value = 2;
-    result = vec4(
-      color.rgb
-        .mul(giPass.a)
-        .add(scenePass.getTextureNode("diffuse").rgb.mul(giPass.rgb)),
-      color.a,
-    );
+    result = Fn(() => {
+      const filtered = bilateralGI(
+        giPass.getTextureNode(),
+        scenePass.getTextureNode("depth"),
+        viewNormal,
+        camera,
+      ).toVar();
+      return vec4(
+        color.rgb
+          .mul(filtered.a)
+          .add(scenePass.getTextureNode("diffuse").rgb.mul(filtered.rgb)),
+        color.a,
+      );
+    })();
   } else if (settings.ao) {
     occlusion = ao(scenePass.getTextureNode("depth"), viewNormal, camera);
     occlusion.resolutionScale = settings.quality === "ultra" ? 0.75 : 0.5;
@@ -276,12 +291,7 @@ function setMode(mode, spawn = true) {
   if (mode === "orbit") {
     controls.target
       .copy(camera.position)
-      .add(
-        new THREE.Vector3(0, -20, -80).applyAxisAngle(
-          new THREE.Vector3(0, 1, 0),
-          explorer.yaw,
-        ),
-      );
+      .add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(80));
     controls.update();
   }
   document.body.classList.toggle("immersed", mode !== "orbit");
@@ -303,8 +313,24 @@ function setMode(mode, spawn = true) {
   if (mode !== "orbit") explorer.capture();
 }
 function visit(key) {
-  setMode("orbit");
+  if (explorer.mode === "orbit") {
+    controls.enableDamping = false;
+    controls.update();
+    controls.enableDamping = true;
+  }
   const place = PLACES[key];
+  if (explorer.mode === "walk") {
+    explorer.teleport(...place.walk);
+    camera.lookAt(...(key === "tea" ? [122, 44.8, -278] : place.target));
+    explorer.setMode("walk", false);
+    explorer.capture();
+    document
+      .querySelectorAll("[data-place]")
+      .forEach((b) => b.classList.toggle("selected", b.dataset.place === key));
+    toast(place.label + " — take a look around.");
+    return;
+  }
+  setMode("orbit");
   flyTo = {
     from: camera.position.clone(),
     fromTarget: controls.target.clone(),
@@ -353,9 +379,14 @@ function toggleSound() {
   $("sound").setAttribute("aria-pressed", String(on));
 }
 function bindUI() {
-  $("world").addEventListener("pointerdown", () =>
-    document.body.classList.add("exploring"),
-  );
+  $("world").addEventListener("pointerdown", () => {
+    document.body.classList.add("exploring");
+    $("neighbourhood").open = false;
+  });
+  $("neighbourhood").addEventListener("toggle", () => {
+    if ($("neighbourhood").open && document.pointerLockElement)
+      document.exitPointerLock();
+  });
   document
     .querySelectorAll("[data-weather]")
     .forEach((b) => (b.onclick = () => preset(b.dataset.weather)));
@@ -439,6 +470,11 @@ function bindUI() {
       $("about").open
     )
       return;
+    if (e.code === "KeyN") {
+      const map = $("neighbourhood");
+      map.open = !map.open;
+      if (map.open && document.pointerLockElement) document.exitPointerLock();
+    }
     if (e.code === "KeyH") toggleSettings();
     if (e.code === "KeyP") togglePhoto();
     if (e.code === "KeyM") toggleSound();
@@ -477,15 +513,20 @@ async function start() {
     );
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(55, 1, 0.25, 8000);
-  camera.position.set(...PLACES.centre.position);
+  camera.position.set(...PLACES[sharedPlace].position);
   controls = new OrbitControls(camera, $("world"));
-  controls.target.set(...PLACES.centre.target);
+  controls.target.set(...PLACES[sharedPlace].target);
   controls.enableDamping = true;
   controls.dampingFactor = 0.065;
   controls.minDistance = 5;
   controls.maxDistance = 1300;
   controls.maxPolarAngle = Math.PI * 0.64;
   controls.autoRotateSpeed = 0.3;
+  controls.addEventListener("start", () => {
+    flyTo = null;
+    touring = false;
+    $("tour").textContent = "Take the slow way ▶";
+  });
   controls.update();
   atmosphere = new Atmosphere(scene, renderer, camera);
   atmosphere.motion = reduced ? 0 : 1;
@@ -552,7 +593,7 @@ async function start() {
   props = new StreetProps({ scene, tier: "hi" });
   // Facade window light is masked by the original material roughness maps.
   // Avoid arbitrary emissive rectangles placed over the real architecture.
-  // Local lights stay in the shader layout throughout the day. Only intensity changes.
+  // Compile local lights only after dusk; nearest-light selection changes intensity, not count.
   props.setGlow(atmosphere.night, atmosphere.night);
   const solids = new MapColliders(solidMeshes, THREE, {
     cell: 8,
@@ -638,6 +679,8 @@ async function start() {
         globalIllumination: !!giPass,
         temporalAA: !!temporal,
         collisionTriangles: solids.tris.length / 9,
+        shadowUpdates: shadowBudget.updates,
+        simulationHz: 90,
       };
     },
   };
@@ -651,24 +694,26 @@ function frame(now) {
   const raw = last ? (now - last) / 1000 : 1 / 60,
     dt = Math.min(raw, 0.05);
   last = now;
-  elapsed += dt;
-  if (settings.daycycle) {
+  elapsed += photo ? 0 : dt;
+  if (settings.daycycle && !photo) {
     settings.hour = (settings.hour + dt / 25) % 24;
     $("time").value = settings.hour;
     $("time-value").value = clockLabel(settings.hour);
     $("clock").textContent = clockLabel(settings.hour);
   }
+  if (!photo && atmosphere.focusShadows(camera)) shadowBudget.invalidate();
   const night = atmosphere.update(dt, settings, elapsed);
   if (flyTo) {
     flyTo.t = Math.min(1, flyTo.t + dt / (reduced ? 0.01 : 2.7));
     const a = flyTo.t * flyTo.t * (3 - 2 * flyTo.t);
     camera.position.lerpVectors(flyTo.from, flyTo.to, a);
     controls.target.lerpVectors(flyTo.fromTarget, flyTo.target, a);
+    camera.lookAt(controls.target);
     if (flyTo.t === 1) flyTo = null;
   }
   controls.autoRotate = touring && !flyTo;
-  if (explorer.mode === "orbit") controls.update(dt);
-  explorer.update(dt);
+  if (explorer.mode === "orbit" && !flyTo) controls.update(dt);
+  if (!photo) explorer.update(dt);
   traffic.update(
     dt,
     settings.traffic && !photo,
@@ -680,7 +725,29 @@ function frame(now) {
     props.setGlow(night, Math.max(0.03, night));
     frame.glow = night;
   }
+  if (elapsed - (frame.mapTime ?? -1) > 0.1) {
+    const p = camera.position;
+    const yaw = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ").y;
+    $("map-player").setAttribute(
+      "transform",
+      `translate(${p.x} ${p.z}) rotate(${(-yaw * 180) / Math.PI})`,
+    );
+    const nearest = Object.values(PLACES)
+      .map((place) => ({
+        place,
+        distance: Math.hypot(p.x - place.walk[0], p.z - place.walk[2]) / 1.5,
+      }))
+      .sort((a, b) => a.distance - b.distance)[0];
+    $("navigation-location").textContent =
+      `${nearest.place.label} · ${Math.round(nearest.distance)} m`;
+    frame.mapTime = elapsed;
+  }
   props.update(camera);
+  atmosphere.sun.shadow.needsUpdate ||= shadowBudget.update(
+    dt,
+    settings,
+    photo || atmosphere.sun.intensity < 0.02,
+  );
   sound.update(dt, camera.position, {
     rain: settings.rain,
     traffic: 1 - night * 0.6,

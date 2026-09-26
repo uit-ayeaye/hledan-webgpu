@@ -198,3 +198,123 @@ test("all six HDR skies and restored 4K material maps are shipped", () => {
     assert.equal(b.subarray(8, 12).toString(), "WEBP");
   }
 });
+
+import { ShadowBudget } from "../src/performance.js";
+import {
+  teaCanopy,
+  teaFurniture,
+  teaCrockery,
+  teaKettle,
+} from "../src/street-detail.js";
+import { PLACES } from "../src/places.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+test("shadow work is bounded, invalidates on lighting changes and freezes for photos", () => {
+  const budget = new ShadowBudget(),
+    settings = { quality: "high", hour: 17.25, rain: 0 };
+  for (let i = 0; i < 600; i++) budget.update(1 / 60, settings);
+  assert.ok(budget.updates >= 150 && budget.updates <= 201);
+  assert.equal(budget.update(0, { ...settings, rain: 1 }), true);
+  const before = budget.updates;
+  for (let i = 0; i < 300; i++)
+    budget.update(1 / 60, { ...settings, rain: 1 }, true);
+  assert.equal(budget.updates, before);
+  budget.invalidate();
+  assert.equal(budget.update(0, settings, true), true);
+});
+
+test("detailed street meshes have finite attributes, physical scale and complete surfaces", () => {
+  for (const build of [teaCanopy, teaFurniture, teaCrockery, teaKettle]) {
+    const g = build();
+    assert.ok(g.attributes.position.count > 100);
+    assert.equal(g.attributes.position.count, g.attributes.normal.count);
+    assert.equal(g.attributes.position.count, g.attributes.color.count);
+    for (const attr of Object.values(g.attributes))
+      for (const value of attr.array) assert.ok(Number.isFinite(value));
+    g.computeBoundingBox();
+    assert.ok(g.boundingBox.max.y < 4);
+    assert.ok(g.boundingBox.min.y >= -0.01);
+    g.dispose();
+  }
+});
+
+test("every walking waypoint has ground and clearance in the real Hledan mesh", async () => {
+  const b = readFileSync(
+    new URL("../public/models/hledan.glb", import.meta.url),
+  );
+  const { scene } = await new GLTFLoader().parseAsync(
+    b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength),
+    "",
+  );
+  const meshes = [];
+  scene.updateMatrixWorld(true);
+  scene.traverse((o) => {
+    if (o.isMesh && !/^Tree/.test(o.name)) meshes.push(o);
+  });
+  const solids = new MapColliders(meshes, THREE, { cell: 8, yLo: 0, yHi: 250 });
+  for (const [key, place] of Object.entries(PLACES)) {
+    const [x, y, z] = place.walk,
+      floor = solids.floorUnder(x, z, y + 3);
+    assert.notEqual(floor, null, key + " has ground");
+    assert.equal(
+      solids.blocked(x, z, 0.48, floor + 0.65, floor + 2.55),
+      false,
+      key + " has headroom",
+    );
+  }
+});
+
+test("walking stays consistent at 30/60/144 FPS and preserves position through modes", () => {
+  const savedDocument = globalThis.document,
+    savedWindow = globalThis.window;
+  const canvas = {
+    addEventListener() {},
+    focus() {
+      document.activeElement = this;
+    },
+  };
+  globalThis.document = {
+    addEventListener() {},
+    pointerLockElement: null,
+    activeElement: canvas,
+  };
+  globalThis.window = { addEventListener() {} };
+  try {
+    const solids = new MapColliders([box(1000, 1, 1000, 0, 42.5, 250)], THREE, {
+      cell: 8,
+    });
+    const results = [];
+    for (const fps of [30, 60, 144]) {
+      const camera = new THREE.PerspectiveCamera();
+      camera.position.set(12, 48, 280);
+      const player = new Explorer(camera, canvas, solids, {}, { player() {} });
+      player.setMode("walk");
+      assert.equal(camera.position.x, 12);
+      assert.equal(camera.position.z, 280);
+      player.keys.add("KeyW");
+      for (let i = 0; i < fps * 3; i++) player.update(1 / fps);
+      results.push(player.body.clone());
+      const before = camera.position.clone();
+      player.setMode("fly");
+      player.setMode("walk");
+      assert.ok(
+        Math.hypot(camera.position.x - before.x, camera.position.z - before.z) <
+          0.001,
+      );
+      player.keys.clear();
+      player.vy = 5;
+      document.activeElement = null;
+      for (let i = 0; i < fps * 2; i++) player.update(1 / fps);
+      assert.equal(
+        player.grounded,
+        true,
+        "gravity settles while controls are unfocused",
+      );
+      document.activeElement = canvas;
+    }
+    for (const p of results) assert.ok(p.distanceTo(results[0]) < 0.08);
+  } finally {
+    globalThis.document = savedDocument;
+    globalThis.window = savedWindow;
+  }
+});

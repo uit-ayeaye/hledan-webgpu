@@ -1,7 +1,8 @@
+import { teaCanopy, teaFurniture, teaCrockery, teaKettle, canopyFabric } from "../street-detail.js";
 /**
  * Street furniture for the junction.
  *
- * The map is a photogrammetry capture merged into eight meshes — every building,
+ * The authored map is merged into eight meshes — every building,
  * vehicle and kerb is welded into one of them, so nothing in it can be moved or
  * rescaled individually. What it lacks is the layer of small stuff that actually
  * makes a Yangon street read as Yangon: the plastic-stool tea shops on the
@@ -20,11 +21,11 @@
  * zero and — more importantly — keeps the layout identical every visit, so it
  * can be art-directed and tested rather than re-rolled on each load.
  *
- * Cost: one InstancedMesh per prop type, no textures, no shadows. Nine draw
- * calls for ~290 objects.
+ * Props share instanced geometry. Near tea-shop crockery is distance culled;
+ * canopies and furniture cast contact shadows.
  */
 import * as THREE from 'three/webgpu';
-import { instancedBufferAttribute } from 'three/tsl';
+import { instancedBufferAttribute, texture, materialOpacity } from 'three/tsl';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WORLD_SCALE as S } from './character.js';
@@ -315,29 +316,8 @@ function taxiGeo() {
 /** Tea shop: a tarpaulin on four poles over a low table and four stools.
     Stool seats sit at 0.30 m — knee height, which is the whole character of
     the thing; putting them at chair height would read as a European cafe. */
-function teaTarpGeo() {
-  // the only tinted part: instanceColor multiplies, so it is left pure white
-  return paint(box(3.2, 0.06, 3.2, 0, 2.25, 0), 0xffffff);
-}
-
-/** The frame, table and stools keep their own colours — a separate mesh so the
-    tarp's per-instance tint does not bleed onto the timber and the plastic. */
-function teaFrameGeo() {
-  const parts = [
-    paint(cyl(0.045, 0.045, 2.25, 5, -1.45, 1.12, -1.45), 0x8d8378),
-    paint(cyl(0.045, 0.045, 2.25, 5,  1.45, 1.12, -1.45), 0x8d8378),
-    paint(cyl(0.045, 0.045, 2.25, 5, -1.45, 1.12,  1.45), 0x8d8378),
-    paint(cyl(0.045, 0.045, 2.25, 5,  1.45, 1.12,  1.45), 0x8d8378),
-    paint(cyl(0.30, 0.30, 0.04, 10, 0, 0.45, 0), 0xc9b79c),   // table top
-    paint(cyl(0.05, 0.05, 0.45, 6, 0, 0.22, 0), 0x9a8b74),
-  ];
-  const stools = [[-0.75, 0, 0.20], [0.75, 0, -0.20], [0.15, 0, 0.80], [-0.20, 0, -0.80]];
-  stools.forEach(([sx, , sz], i) => {
-    parts.push(paint(cyl(0.14, 0.12, 0.04, 8, sx, 0.30, sz), STOOL_COLOURS[i % STOOL_COLOURS.length]));
-    parts.push(paint(cyl(0.10, 0.12, 0.28, 6, sx, 0.15, sz), STOOL_COLOURS[i % STOOL_COLOURS.length]));
-  });
-  return merge(parts, 'prop');
-}
+function teaTarpGeo() { return teaCanopy(); }
+function teaFrameGeo() { return teaFurniture(); }
 
 /** Vendor stall: a big umbrella over a crate table. */
 function stallCanopyGeo() {
@@ -1121,6 +1101,9 @@ function haloPoints(entries, map) {
   });
   mat.positionNode = instancedBufferAttribute(new THREE.InstancedBufferAttribute(pos, 3));
   mat.colorNode = instancedBufferAttribute(new THREE.InstancedBufferAttribute(col, 3));
+  // A custom colorNode bypasses the material map, including its alpha channel.
+  // Explicitly retain the radial mask so WebGPU sprites never become luminous squares.
+  mat.opacityNode = materialOpacity.mul(texture(map).a);
   mat.scaleNode = instancedBufferAttribute(new THREE.InstancedBufferAttribute(size, 1));
   const opacityHandle = {};
   Object.defineProperty(opacityHandle, 'value', {
@@ -1185,6 +1168,26 @@ export class StreetProps {
       return [...instancedLayer(a, mk(), place, colours, cull), ...instancedLayer(b, mk(), place, null, cull)];
     };
 
+    const teaPlace = layout(TEA, 0x54454, 0);
+    const cloth = mk();
+    cloth.side = THREE.DoubleSide;
+    cloth.map = canopyFabric();
+    cloth.bumpMap = cloth.map;
+    cloth.bumpScale = .008;
+    cloth.roughness = .88;
+    const ceramic = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .23, clearcoat: .35 });
+    const steel = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: .8, roughness: .28 });
+    const teaBase = [
+      ...instancedLayer(teaTarpGeo(), cloth, teaPlace, TARP_COLOURS, cull),
+      ...instancedLayer(teaFrameGeo(), mk(), teaPlace, null, cull),
+    ];
+    // Contact shadows anchor the open legs, cups and canopy to the street.
+    teaBase.forEach(mesh => { mesh.castShadow = mesh.receiveShadow = true; });
+    const closeDetails = [
+      ...instancedLayer(teaCrockery(), ceramic, teaPlace, null, cull),
+      ...instancedLayer(teaKettle(), steel, teaPlace, null, cull),
+    ];
+    closeDetails.forEach(mesh => { mesh.receiveShadow = true; mesh.userData.detailDistance = 100; });
     const busRows = take(BUS);
     const taxiRows = take(TAXI, 2);
     /* Resolved once, shared by the bodywork, the lamps, the beams and the
@@ -1205,7 +1208,7 @@ export class StreetProps {
     this.meshes = [
       busBody,
       ...taxiBodies,
-      ...pair(teaTarpGeo(),    teaFrameGeo(),   TEA,   TARP_COLOURS, 0x54454, 0),
+      ...teaBase, ...closeDetails,
       ...pair(stallCanopyGeo(), stallFrameGeo(), STALL, TARP_COLOURS, 0x5741, 0),
       ...instanced(potStandGeo(), mk(), POT,     null, 0x504F54, 0, cull),
       ...instancedLayer(poleGeo(), mk(), polePlace, null, cull),
@@ -1952,13 +1955,14 @@ export class StreetProps {
       let n = 0;
       for (let i = 0; i < place.length; i++) {
         const pl = place[i];
-        if (far2 > 0) {
+        const limit2 = mesh.userData.detailDistance ? mesh.userData.detailDistance ** 2 : far2;
+        if (limit2 > 0) {
           const dx = pl.x - p.x, dz = pl.z - p.z;
-          if (dx * dx + dz * dz > far2) continue;
+          if (dx * dx + dz * dz > limit2) continue;
         }
         sph.center.set(pl.x, pl.y + oy * pl.s, pl.z);
         sph.radius = r * pl.s;
-        if (!fr.intersectsSphere(sph)) continue;
+        if (!fr.intersectsSphere(sph) && (!mesh.castShadow || sph.center.distanceToSquared(p) > 60 * 60)) continue;
         dummy.position.set(pl.x, pl.y, pl.z);
         dummy.rotation.set(0, pl.yaw, 0);
         dummy.scale.set(pl.s, pl.s, pl.s);

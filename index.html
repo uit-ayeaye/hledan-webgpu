@@ -134,9 +134,32 @@
           ><button id="tour" class="text-button">Take the slow way ▶</button>
         </div>
       </section>
-      <details class="places">
+      <details class="places" id="neighbourhood">
         <summary>Explore the neighbourhood <span>＋</span></summary>
         <div class="places-list">
+          <div
+            class="neighbourhood-map"
+            aria-label="Schematic map of Hledan, showing your position"
+          >
+            <img
+              src="./neighbourhood.svg"
+              alt="Roads, buildings and the flyover from the original Hledan map"
+            />
+            <svg viewBox="-450 -920 900 1840" aria-hidden="true">
+              <g class="map-stops">
+                <circle cx="-46" cy="262" r="12" />
+                <circle cx="54" cy="80" r="12" />
+                <circle cx="130.5" cy="-269.5" r="12" />
+                <circle cx="-46" cy="360" r="12" />
+              </g>
+              <g id="map-player">
+                <circle r="28" />
+                <path d="M0 -25L13 13L0 7L-13 13Z" />
+              </g>
+            </svg>
+            <span>HLEDAN JUNCTION · SCHEMATIC</span>
+          </div>
+          <p id="navigation-location" role="status">Hledan Centre</p>
           <span class="eyebrow">FIND YOUR WAY</span
           ><button data-place="junction">
             <span>01</span> The junction <b>↗</b></button
@@ -241,8 +264,8 @@
       </p>
       <div class="keys">
         <b>WASD</b> Move &nbsp; <b>Space</b> Jump / fly up &nbsp; <b>C</b> Fly
-        down<br /><b>H</b> Settings &nbsp; <b>P</b> Photo &nbsp; <b>M</b> Sound
-        &nbsp; <b>Esc</b> Release
+        down<br /><b>N</b> Neighbourhood &nbsp; <b>H</b> Settings &nbsp;
+        <b>P</b> Photo &nbsp; <b>M</b> Sound &nbsp; <b>Esc</b> Release
       </div>
     </dialog>
     <div id="toast" role="status" hidden></div>

@@ -15,8 +15,17 @@ export class Explorer {
     this.grounded = false;
     this.vy = 0;
     this.stepTime = 0;
+    this.body = camera.position.clone();
+    this.previous = this.body.clone();
+    this.accumulator = 0;
+    this.eyeOffset = 0;
     document.addEventListener("keydown", (e) => {
-      if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+      if (
+        /INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName) ||
+        e.target.isContentEditable ||
+        e.target.closest?.("dialog")
+      )
+        return;
       this.keys.add(e.code);
       if (
         this.mode !== "orbit" &&
@@ -25,8 +34,14 @@ export class Explorer {
         e.preventDefault();
     });
     document.addEventListener("keyup", (e) => this.keys.delete(e.code));
-    window.addEventListener("blur", () => this.keys.clear());
-    document.addEventListener("visibilitychange", () => this.keys.clear());
+    const release = () => {
+      this.keys.clear();
+      this.dragging = false;
+      this.velocity.set(0, 0, 0);
+      this.accumulator = 0;
+    };
+    window.addEventListener("blur", release);
+    document.addEventListener("visibilitychange", release);
     document.addEventListener("pointerlockchange", () => {
       document.body.classList.toggle("locked", !!document.pointerLockElement);
       if (!document.pointerLockElement) this.keys.clear();
@@ -58,6 +73,10 @@ export class Explorer {
   }
   setMode(mode, spawn = true) {
     this.mode = mode;
+    this.body.copy(this.camera.position);
+    this.previous.copy(this.body);
+    this.accumulator = 0;
+    this.eyeOffset = 0;
     this.velocity.set(0, 0, 0);
     this.vy = 0;
     this.keys.clear();
@@ -65,7 +84,13 @@ export class Explorer {
       if (document.pointerLockElement) document.exitPointerLock();
       return;
     }
-    if (mode === "walk" && spawn) this.teleport(-46, 43.5, 262);
+    if (mode === "walk" && spawn) {
+      const p = this.camera.position;
+      const floor = this.solids.floorUnder(p.x, p.z, p.y);
+      if (floor !== null && !this.blocked(p.x, p.z, floor))
+        this.teleport(p.x, floor, p.z);
+      else this.teleport(-46, 43.5, 262);
+    }
     const e = new Euler().setFromQuaternion(this.camera.quaternion, "YXZ");
     this.yaw = e.y;
     this.pitch = e.x;
@@ -73,7 +98,10 @@ export class Explorer {
   teleport(x, y, z) {
     const f = this.solids.floorUnder(x, z, y + 3);
     this.camera.position.set(x, (f ?? y) + EYE, z);
-    this.camera.lookAt(-50, 46, 360);
+    this.body.copy(this.camera.position);
+    this.previous.copy(this.body);
+    this.eyeOffset = 0;
+    this.accumulator = 0;
     this.vy = 0;
   }
   blocked(x, z, feet) {
@@ -90,7 +118,25 @@ export class Explorer {
       document.pointerLockElement !== this.canvas &&
       document.activeElement !== this.canvas
     )
-      return;
+      this.keys.clear();
+    // Bounded fixed simulation ticks make collision and acceleration independent of FPS.
+    const tick = 1 / 90;
+    this.accumulator += Math.min(Math.max(dt, 0), 0.1);
+    while (this.accumulator >= tick) {
+      this.previous.copy(this.body);
+      this.simulate(tick);
+      this.accumulator -= tick;
+    }
+    this.accumulator = Math.max(0, this.accumulator);
+    this.eyeOffset = MathUtils.damp(this.eyeOffset, 0, 18, dt);
+    this.camera.position.lerpVectors(
+      this.previous,
+      this.body,
+      this.accumulator / tick,
+    );
+    this.camera.position.y += this.eyeOffset;
+  }
+  simulate(dt) {
     const k = this.keys,
       sprint = k.has("ShiftLeft") || k.has("ShiftRight");
     let ax = Number(k.has("KeyD")) - Number(k.has("KeyA")),
@@ -104,7 +150,7 @@ export class Explorer {
       tz = (-ax * Math.sin(this.yaw) + az * Math.cos(this.yaw)) * speed;
     this.velocity.x = MathUtils.damp(this.velocity.x, tx, 12, dt);
     this.velocity.z = MathUtils.damp(this.velocity.z, tz, 12, dt);
-    const p = this.camera.position;
+    const p = this.body;
     if (this.mode === "fly") {
       p.x += this.velocity.x * dt;
       p.z += this.velocity.z * dt;
@@ -140,6 +186,8 @@ export class Explorer {
       feet + (this.vy <= 0 ? STEP : 0),
     );
     if (floor !== null && next <= floor && this.vy <= 0) {
+      if (this.grounded && floor > feet && floor - feet <= STEP)
+        this.eyeOffset -= floor - feet;
       next = floor;
       this.vy = 0;
       this.grounded = true;
