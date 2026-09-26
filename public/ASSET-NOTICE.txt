@@ -1,0 +1,32 @@
+Hledan Junction — third-party assets
+====================================
+
+Vehicle models
+--------------
+
+showcase/hledan/models/vehicles/bus-poly.glb
+  "Bus" by Poly by Google
+  Source:  https://poly.pizza/m/4CPpvEmrMoF
+  Licence: Creative Commons Attribution (CC-BY 3.0)
+           https://creativecommons.org/licenses/by/3.0/
+  ATTRIBUTION IS REQUIRED for this asset and is given here and in the
+  page's info panel. Do not remove either without also removing the model.
+
+showcase/hledan/models/vehicles/car-quaternius.glb
+  "Car" by Quaternius
+  Source:  https://poly.pizza/m/unqqkULtRU
+  Licence: Public Domain (CC0 1.0)
+           https://creativecommons.org/publicdomain/zero/1.0/
+  No attribution required. Credited anyway, as a courtesy.
+
+Both were downloaded from Poly Pizza (https://poly.pizza) and are used
+unmodified except for normalisation performed at load time: each is scaled
+per-axis to its real-world dimensions (bus 2.50 x 3.20 x 11.5 m, car
+1.78 x 1.52 x 4.40 m), centred, and dropped onto the ground plane. See
+assets/props.js -> loadVehicleGeometry.
+
+Everything else on this page — the street furniture, the tea shops, the
+water-pot stands, the poles and cables, the lighting and the soundscape —
+is generated procedurally in this repository and carries no third-party
+licence. The map itself (models/hledan.glb) and the character models are
+covered by the showcase's own terms.
