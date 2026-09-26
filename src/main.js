@@ -69,7 +69,7 @@ const sound = new Soundscape("hi");
 const PLACES = {
   junction: { position: [188, 214, 486], target: [-24, 58, 300] },
   flyover: { position: [46, 86, 58], target: [-6, 64, 262] },
-  tea: { position: [59, 49, 279], target: [50, 46, 263] },
+  tea: { position: [130.5, 47.3, -269.5], target: [122, 45.3, -278] },
   centre: { position: [-46, 52, 262], target: [-50, 58, 360] },
 };
 function toast(text) {
