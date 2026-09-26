@@ -30,22 +30,22 @@ Its MIT code can be adapted with attribution, but integrating the entire particl
 
 ## Adopted versus deferred
 
-| Reference technique | This Hledan release | Difference / reason |
-|---|---|---|
-| Native browser GPU execution | Three.js WebGPURenderer + TSL | Real WebGPU, with Three managing resources; not raw WGSL engine parity |
-| Atmospheric sky | SkyMesh Preetham atmosphere, sun, procedural clouds, stars | Not Hillaire multi-LUT scattering or volumetric cloud ray marching |
-| HDR post processing | GTAO, bloom, FXAA, vignette, exposure, neutral tone mapping | No temporal motion vectors, TAAU, motion blur or auto exposure |
-| Dynamic quality | Three quality tiers and adaptive pixel ratio | Targets frame budget; performance depends on hardware and view |
-| Shadows | Directional shadow map, 1024 / 2048 / 4096 | Not cascaded contact-hardening sun shadows |
-| Wet surfaces | Prefiltered environment specular, clearcoat, roughness, procedural road normals | No screen-space building reflections |
-| GPU particles | 18k rain drops + 900 surface ripple quads | Height-field collisions; no pressure/XPBD fluid volume |
-| First-person movement | Gravity, jumping, wall collision, step-up, floor/ceiling separation | No swimming, boat walking or crouching |
-| Moving vehicles | Measured two-lane flyover route and pedestrian braking | Kinematic, not drivable rigid-body vehicles |
-| Environmental audio | Synthesized traffic, horns, cups, birds, rain, footsteps | No claimed Yangon field recordings |
-| Photo / settings / saved preferences | Implemented | Settings persist locally; photo exports the rendered canvas |
-| GLB and local assets | Original Hledan plus attributed vehicle models | No Tidewater island, Rocketbox characters or ocean assets bundled |
-| Shipping | Vite + GitHub Actions + GitHub Pages | Standalone repository, same class of static hosting |
-| World scale | Hledan only | Other Yangon districts need separately sourced/authored maps |
+| Reference technique                  | This Hledan release                                                             | Difference / reason                                                    |
+| ------------------------------------ | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Native browser GPU execution         | Three.js WebGPURenderer + TSL                                                   | Real WebGPU, with Three managing resources; not raw WGSL engine parity |
+| Atmospheric sky                      | SkyMesh Preetham atmosphere, sun, procedural clouds, stars                      | Not Hillaire multi-LUT scattering or volumetric cloud ray marching     |
+| HDR post processing                  | GTAO, bloom, FXAA, vignette, exposure, neutral tone mapping                     | No temporal motion vectors, TAAU, motion blur or auto exposure         |
+| Dynamic quality                      | Three quality tiers and adaptive pixel ratio                                    | Targets frame budget; performance depends on hardware and view         |
+| Shadows                              | Directional shadow map, 1024 / 2048 / 4096                                      | Not cascaded contact-hardening sun shadows                             |
+| Wet surfaces                         | Prefiltered environment specular, clearcoat, roughness, procedural road normals | No screen-space building reflections                                   |
+| GPU particles                        | 18k rain drops + 900 surface ripple quads                                       | Height-field collisions; no pressure/XPBD fluid volume                 |
+| First-person movement                | Gravity, jumping, wall collision, step-up, floor/ceiling separation             | No swimming, boat walking or crouching                                 |
+| Moving vehicles                      | Measured two-lane flyover route and pedestrian braking                          | Kinematic, not drivable rigid-body vehicles                            |
+| Environmental audio                  | Synthesized traffic, horns, cups, birds, rain, footsteps                        | No claimed Yangon field recordings                                     |
+| Photo / settings / saved preferences | Implemented                                                                     | Settings persist locally; photo exports the rendered canvas            |
+| GLB and local assets                 | Original Hledan plus attributed vehicle models                                  | No Tidewater island, Rocketbox characters or ocean assets bundled      |
+| Shipping                             | Vite + GitHub Actions + GitHub Pages                                            | Standalone repository, same class of static hosting                    |
+| World scale                          | Hledan only                                                                     | Other Yangon districts need separately sourced/authored maps           |
 
 ## Existing-map constraints
 

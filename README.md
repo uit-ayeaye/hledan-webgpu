@@ -2,7 +2,9 @@
 
 A standalone desktop WebGPU experience built around Thomas D. Lynn’s original Hledan Junction map. Walk under the flyover, watch YBS traffic, listen to the street, and let the afternoon turn into monsoon or night.
 
-**Live:** https://uit-ayeaye.github.io/hledan-webgpu/
+**Live:** https://thomasdlynn.dev/hledan-webgpu/
+
+![Monsoon over Hledan, captured from the running WebGPU app](docs/hledan-monsoon.png)
 
 ## Run
 
@@ -32,16 +34,16 @@ Use a current desktop browser with WebGPU and hardware acceleration, over HTTPS 
 
 ## Controls
 
-| Control | Action |
-|---|---|
-| Drag / scroll | Orbit / zoom in Explore |
-| WASD | Move in Walk / Fly |
-| Mouse / drag | Look in Walk / Fly |
-| Shift | Run / fast flight |
-| Space | Jump / fly up |
-| C | Fly down |
-| Esc | Release captured mouse |
-| H / P / M | Settings / photo mode / sound |
+| Control       | Action                        |
+| ------------- | ----------------------------- |
+| Drag / scroll | Orbit / zoom in Explore       |
+| WASD          | Move in Walk / Fly            |
+| Mouse / drag  | Look in Walk / Fly            |
+| Shift         | Run / fast flight             |
+| Space         | Jump / fly up                 |
+| C             | Fly down                      |
+| Esc           | Release captured mouse        |
+| H / P / M     | Settings / photo mode / sound |
 
 ## Scope and limitations
 
