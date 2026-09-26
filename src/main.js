@@ -11,7 +11,18 @@ import {
   mrt,
   output,
   normalView,
+  roughness,
+  vec2,
+  smoothstep,
+  velocity,
+  diffuseColor,
+  directionToColor,
+  colorToDirection,
+  sample,
 } from "three/tsl";
+import { HalfResolutionSSGI } from "./rendering.js";
+import { traa } from "three/addons/tsl/display/TRAANode.js";
+import { ssr } from "three/addons/tsl/display/SSRNode.js";
 import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { ao } from "three/addons/tsl/display/GTAONode.js";
 import { fxaa } from "three/addons/tsl/display/FXAANode.js";
@@ -29,10 +40,15 @@ import {
   DEFAULTS,
   PRESETS,
   clockLabel,
+  skyForHour,
 } from "./settings.js";
 
 const $ = (id) => document.getElementById(id),
   settings = loadSettings();
+// A shared moment opens consistently without discarding the visitor's other preferences.
+const sharedMoment = new URLSearchParams(location.search).get("moment");
+if (sharedMoment && Object.hasOwn(PRESETS, sharedMoment))
+  Object.assign(settings, PRESETS[sharedMoment], { preset: sharedMoment });
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 if (reduced) {
   settings.traffic = false;
@@ -50,6 +66,9 @@ let renderer,
   traffic,
   pipeline,
   occlusion,
+  reflections,
+  giPass,
+  temporal,
   bloomPass,
   scenePass;
 let running = true,
@@ -70,7 +89,7 @@ const PLACES = {
   junction: { position: [188, 214, 486], target: [-24, 58, 300] },
   flyover: { position: [46, 86, 58], target: [-6, 64, 262] },
   tea: { position: [130.5, 47.3, -269.5], target: [122, 45.3, -278] },
-  centre: { position: [-46, 52, 262], target: [-50, 58, 360] },
+  centre: { position: [-46, 52, 262], target: [-50, 90, 430] },
 };
 function toast(text) {
   $("toast").textContent = text;
@@ -109,11 +128,19 @@ function syncUI() {
   for (const id of ["quality", "rain", "haze", "exposure"])
     $(id).value = settings[id];
   $("time").value = settings.hour;
-  for (const id of ["bloom", "ao", "traffic", "adaptive", "daycycle"])
+  for (const id of [
+    "bloom",
+    "ao",
+    "reflections",
+    "traffic",
+    "adaptive",
+    "daycycle",
+  ])
     $(id).checked = settings[id];
   $("time-value").value = clockLabel(settings.hour);
   $("clock").textContent = clockLabel(settings.hour);
   $("rain-value").value = Math.round(settings.rain * 100) + "%";
+  document.body.dataset.weather = settings.preset;
   $("weather-label").textContent =
     PRESETS[settings.preset]?.label ?? "YOUR MOMENT";
   document.querySelectorAll("[data-weather]").forEach((b) => {
@@ -141,22 +168,57 @@ function graphics() {
 }
 function buildPipeline() {
   pipeline?.dispose();
+  giPass?.dispose();
+  temporal?.dispose();
+  giPass = null;
+  temporal = null;
   occlusion?.dispose();
+  reflections?.dispose();
+  reflections = null;
   bloomPass?.dispose();
   scenePass?.dispose();
   occlusion = null;
   bloomPass = null;
   pipeline = new THREE.RenderPipeline(renderer);
   scenePass = pass(scene, camera);
-  scenePass.setMRT(mrt({ output, normal: normalView }));
+  const advanced =
+    renderer.backend.isWebGPUBackend && settings.quality !== "balanced";
+  const targets = {
+    output,
+    normal: vec4(directionToColor(normalView), roughness),
+  };
+  if (advanced) targets.velocity = velocity;
+  if (advanced && settings.quality === "ultra") targets.diffuse = diffuseColor;
+  scenePass.setMRT(mrt(targets));
+  // Stay within WebGPU’s baseline 32-byte color attachment budget.
+  scenePass.getTexture("normal").type = THREE.UnsignedByteType;
+  if (targets.diffuse)
+    scenePass.getTexture("diffuse").type = THREE.UnsignedByteType;
   const color = scenePass.getTextureNode("output");
+  const packedNormal = scenePass.getTextureNode("normal");
+  const viewNormal = sample((coord) =>
+    colorToDirection(packedNormal.sample(coord)),
+  );
   let result = color;
-  if (settings.ao) {
-    occlusion = ao(
+  if (settings.ao && advanced && settings.quality === "ultra") {
+    giPass = new HalfResolutionSSGI(
+      color,
       scenePass.getTextureNode("depth"),
-      scenePass.getTextureNode("normal"),
+      viewNormal,
       camera,
     );
+    giPass.sliceCount.value = 1;
+    giPass.stepCount.value = 8;
+    giPass.radius.value = 16;
+    giPass.thickness.value = 2;
+    result = vec4(
+      color.rgb
+        .mul(giPass.a)
+        .add(scenePass.getTextureNode("diffuse").rgb.mul(giPass.rgb)),
+      color.a,
+    );
+  } else if (settings.ao) {
+    occlusion = ao(scenePass.getTextureNode("depth"), viewNormal, camera);
     occlusion.resolutionScale = settings.quality === "ultra" ? 0.75 : 0.5;
     occlusion.radius.value = 3;
     occlusion.thickness.value = 2;
@@ -164,12 +226,45 @@ function buildPipeline() {
       vec4(vec3(occlusion.getTextureNode().r.mul(0.6).add(0.4)), 1),
     );
   }
+  if (
+    settings.reflections &&
+    settings.quality !== "balanced" &&
+    renderer.backend.isWebGPUBackend
+  ) {
+    const surfaceRoughness = packedNormal.a;
+    const reflectivity = float(1)
+      .sub(smoothstep(0.08, 0.42, surfaceRoughness))
+      .mul(0.55);
+    reflections = ssr(
+      color,
+      scenePass.getTextureNode("depth"),
+      viewNormal,
+      reflectivity,
+      surfaceRoughness,
+      camera,
+    );
+    reflections.resolutionScale = settings.quality === "ultra" ? 0.5 : 0.35;
+    reflections.quality.value = settings.quality === "ultra" ? 0.2 : 0.08;
+    reflections.maxDistance.value = 90;
+    reflections.thickness.value = 0.8;
+    reflections.opacity.value = 0.8;
+    result = result.add(vec4(reflections.rgb, 0));
+  }
   if (settings.bloom) {
-    bloomPass = bloom(color, 0.16, 0.45, 1.2);
+    bloomPass = bloom(color, 0.2, 0.45, 1.6);
     result = result.add(bloomPass);
   }
-  const vignette = float(1).sub(uv().sub(0.5).length().pow(2).mul(0.38));
-  pipeline.outputNode = fxaa(result.mul(vec4(vec3(vignette), 1)));
+  const vignette = float(1).sub(uv().sub(0.5).length().pow(2).mul(0.16));
+  const composite = result.mul(vec4(vec3(vignette), 1));
+  if (advanced) {
+    temporal = traa(
+      composite,
+      scenePass.getTextureNode("depth"),
+      scenePass.getTextureNode("velocity"),
+      camera,
+    );
+    pipeline.outputNode = temporal;
+  } else pipeline.outputNode = fxaa(composite);
 }
 function setMode(mode, spawn = true) {
   touring = false;
@@ -221,7 +316,17 @@ function visit(key) {
     .querySelectorAll("[data-place]")
     .forEach((b) => b.classList.toggle("selected", b.dataset.place === key));
 }
-function preset(key) {
+async function preset(key) {
+  const request = (preset.request = (preset.request ?? 0) + 1);
+  $("weather-label").textContent = "PREPARING YOUR MOMENT…";
+  try {
+    await atmosphere.loadSky(skyForHour(PRESETS[key].hour, PRESETS[key].rain));
+  } catch {
+    toast("That sky could not load. Keeping the current atmosphere.");
+    syncUI();
+    return;
+  }
+  if (request !== preset.request) return;
   Object.assign(settings, PRESETS[key], { preset: key });
   syncUI();
   saveSettings(settings);
@@ -248,6 +353,9 @@ function toggleSound() {
   $("sound").setAttribute("aria-pressed", String(on));
 }
 function bindUI() {
+  $("world").addEventListener("pointerdown", () =>
+    document.body.classList.add("exploring"),
+  );
   document
     .querySelectorAll("[data-weather]")
     .forEach((b) => (b.onclick = () => preset(b.dataset.weather)));
@@ -302,10 +410,18 @@ function bindUI() {
       syncUI();
       saveSettings(settings);
     };
-  for (const id of ["bloom", "ao", "traffic", "adaptive", "daycycle"])
+  for (const id of [
+    "bloom",
+    "ao",
+    "reflections",
+    "traffic",
+    "adaptive",
+    "daycycle",
+  ])
     $(id).onchange = (e) => {
       settings[id] = e.target.checked;
-      if (id === "bloom" || id === "ao") buildPipeline();
+      if (id === "bloom" || id === "ao" || id === "reflections")
+        buildPipeline();
       if (id === "adaptive" && !settings.adaptive) {
         scale = 1;
         resize();
@@ -350,7 +466,7 @@ async function start() {
   await renderer.init();
   const gpu = renderer.backend.isWebGPUBackend;
   $("backend").innerHTML = `<i></i>${gpu ? "WEBGPU" : "WEBGL2 COMPATIBILITY"}`;
-  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMapping = THREE.AgXToneMapping;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.onDeviceLost = (info) =>
@@ -361,17 +477,18 @@ async function start() {
     );
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(55, 1, 0.25, 8000);
-  camera.position.set(...PLACES.junction.position);
+  camera.position.set(...PLACES.centre.position);
   controls = new OrbitControls(camera, $("world"));
-  controls.target.set(...PLACES.junction.target);
+  controls.target.set(...PLACES.centre.target);
   controls.enableDamping = true;
   controls.dampingFactor = 0.065;
   controls.minDistance = 5;
   controls.maxDistance = 1300;
-  controls.maxPolarAngle = Math.PI * 0.49;
+  controls.maxPolarAngle = Math.PI * 0.64;
   controls.autoRotateSpeed = 0.3;
   controls.update();
   atmosphere = new Atmosphere(scene, renderer, camera);
+  atmosphere.motion = reduced ? 0 : 1;
   atmosphere.update(1, settings, 0);
   resize();
   progress(15, "Returning to the junction…");
@@ -386,10 +503,14 @@ async function start() {
     },
   );
   const textureLoader = new THREE.TextureLoader();
+  await atmosphere.loadSurfaces(base);
   const recipes = {
-    Building: ["hi/building_basecolor.webp", "building_roughness.webp"],
-    Environment: ["hi/environment_basecolor.webp"],
-    Hledan_Center: ["hi/hledan_basecolor.webp", "hledan_roughness.webp"],
+    Building: ["hi/building_basecolor.webp", "hi/building_roughness.webp"],
+    Environment: [
+      "hi/environment_basecolor.webp",
+      "hi/environment_roughness.webp",
+    ],
+    Hledan_Center: ["hi/hledan_basecolor.webp", "hi/hledan_roughness.webp"],
     "Road texture": ["road_basecolor.webp"],
   };
   const materials = {};
@@ -401,7 +522,7 @@ async function start() {
       maps.forEach((t, i) => {
         t.flipY = false;
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
-        t.anisotropy = 8;
+        t.anisotropy = 16;
         if (i === 0) t.colorSpace = THREE.SRGBColorSpace;
       });
       materials[name] = atmosphere.material(name, maps[0], maps[1]);
@@ -415,8 +536,9 @@ async function start() {
     o.material =
       materials[name] ??
       new THREE.MeshStandardNodeMaterial({ color: 0xaaaa99 });
+    if (/^Tree/.test(o.name)) o.material = atmosphere.foliage(o.material);
     o.receiveShadow = true;
-    o.castShadow = name === "Building" || name === "Hledan_Center";
+    o.castShadow = true;
     if (!/^Tree\(/.test(o.name)) solidMeshes.push(o);
     if (
       (name === "Building" || name === "Hledan_Center") &&
@@ -428,8 +550,8 @@ async function start() {
   gltf.scene.updateMatrixWorld(true);
   progress(52, "Opening tea stalls and waking the streetlights…");
   props = new StreetProps({ scene, tier: "hi" });
-  props.buildWindows(buildings, 40, "hi");
-  props.buildNeon(buildings, 40, "hi");
+  // Facade window light is masked by the original material roughness maps.
+  // Avoid arbitrary emissive rectangles placed over the real architecture.
   // Local lights stay in the shader layout throughout the day. Only intensity changes.
   props.setGlow(atmosphere.night, atmosphere.night);
   const solids = new MapColliders(solidMeshes, THREE, {
@@ -442,7 +564,7 @@ async function start() {
   explorer.traffic = traffic;
   progress(63, "Preparing the sky and reflections…");
   await atmosphere.environment();
-  if (gpu) rain = new Rain(scene, renderer, solids);
+  if (gpu) rain = new Rain(scene, renderer, solids, camera);
   else
     toast(
       "Compatibility rendering: GPU rain is unavailable. Try a WebGPU-capable desktop browser.",
@@ -511,6 +633,10 @@ async function start() {
         triangles: renderer.info.render.triangles,
         drawCalls: renderer.info.render.drawCalls,
         traffic: traffic.cars.length,
+        sky: atmosphere.currentSky,
+        reflections: !!reflections,
+        globalIllumination: !!giPass,
+        temporalAA: !!temporal,
         collisionTriangles: solids.tris.length / 9,
       };
     },
@@ -589,7 +715,7 @@ function frame(now) {
     $("performance").textContent =
       `${Math.round(fps)} FPS · ${renderer.backend.isWebGPUBackend ? "WebGPU" : "WebGL2"}\n${Math.round(scale * 100)}% render scale · ${settings.quality}\n${rain?.count ?? 0} GPU rain particles · ${traffic.cars.length} moving vehicles`;
     cooldown = Math.max(0, cooldown - 1);
-    if (settings.adaptive && cooldown === 0) {
+    if (settings.adaptive && cooldown === 0 && elapsed > 10) {
       const next =
         fps < 42
           ? Math.max(0.6, scale - 0.08)
@@ -599,7 +725,7 @@ function frame(now) {
       if (next !== scale) {
         scale = next;
         resize();
-        cooldown = 3;
+        cooldown = 5;
       }
     }
     frames = 0;

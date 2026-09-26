@@ -26,11 +26,15 @@ import {
   instancedBufferAttribute,
 } from "three/tsl";
 import { SkyMesh } from "three/addons/objects/SkyMesh.js";
+import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
+import { skyForHour } from "./settings.js";
 
 // A GPU particle integrator with gravity, wind, terminal speed, and collision
 // against a height field baked from the actual roofs / flyover / road meshes.
 export class Rain {
-  constructor(scene, renderer, solids) {
+  constructor(scene, renderer, solids, camera) {
+    this.camera = camera;
+    this.center = uniform(camera.position.clone());
     this.renderer = renderer;
     this.count = 18000;
     this.amount = uniform(0);
@@ -63,9 +67,9 @@ export class Rain {
       const p = positions.element(instanceIndex);
       p.assign(
         vec3(
-          hash(instanceIndex).mul(900).sub(450),
-          hash(instanceIndex.add(37)).mul(320).add(45),
-          hash(instanceIndex.add(71)).mul(1300).sub(450),
+          hash(instanceIndex).mul(220).sub(110).add(this.center.x),
+          hash(instanceIndex.add(37)).mul(150).add(this.center.y),
+          hash(instanceIndex.add(71)).mul(220).sub(110).add(this.center.z),
         ),
       );
       speeds
@@ -86,20 +90,22 @@ export class Rain {
       If(
         p.y
           .lessThan(ground.add(0.3))
-          .or(p.x.greaterThan(450))
-          .or(p.z.greaterThan(850)),
+          .or(p.x.sub(this.center.x).abs().greaterThan(110))
+          .or(p.z.sub(this.center.z).abs().greaterThan(110)),
         () => {
           p.x.assign(
             hash(instanceIndex.add(this.clock.mul(17).floor()))
-              .mul(900)
-              .sub(450),
+              .mul(220)
+              .sub(110)
+              .add(this.center.x),
           );
           p.z.assign(
             hash(instanceIndex.add(this.clock.mul(13).floor()).add(11))
-              .mul(1300)
-              .sub(450),
+              .mul(220)
+              .sub(110)
+              .add(this.center.z),
           );
-          p.y.assign(float(340).add(hash(instanceIndex).mul(45)));
+          p.y.assign(this.center.y.add(85).add(hash(instanceIndex).mul(65)));
           speed.assign(35);
         },
       );
@@ -111,8 +117,11 @@ export class Rain {
       side: THREE.DoubleSide,
     });
     mat.positionNode = positions.toAttribute();
-    mat.scaleNode = vec2(0.1, 2.5);
-    mat.opacityNode = this.amount.mul(0.36);
+    mat.scaleNode = vec2(0.07, 2.8);
+    mat.opacityNode = this.amount
+      .mul(0.34)
+      .mul(float(1).sub(uv().y.sub(0.5).abs().mul(2)))
+      .mul(float(1).sub(uv().x.sub(0.5).abs().mul(2)));
     const geo = new THREE.PlaneGeometry(1, 1);
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.count = this.count;
@@ -155,6 +164,7 @@ export class Rain {
     scene.add(this.splashes);
   }
   update(dt, amount, elapsed) {
+    this.center.value.copy(this.camera.position);
     this.amount.value = amount;
     this.mesh.visible = amount > 0.025;
     this.splashes.visible = this.mesh.visible;
@@ -165,163 +175,247 @@ export class Rain {
   }
 }
 
+// Captured, unclipped HDR radiance drives both the sky and the material lighting.
+// A procedural sky remains available if a sky download fails.
+const SKY_FILES = {
+  dawn: "qwantani_sunrise_puresky",
+  golden: "qwantani_sunset_puresky",
+  clear: "qwantani_noon_puresky",
+  monsoon: "kloofendal_overcast_puresky",
+  blue: "qwantani_dusk_2_puresky",
+  night: "qwantani_night_puresky",
+};
 export class Atmosphere {
   constructor(scene, renderer, camera) {
     Object.assign(this, { scene, renderer, camera });
     this.wet = uniform(0);
+    this.windowLight = uniform(0);
     this.t = uniform(0);
     this.materials = [];
+    this.skies = new Map();
+    this.pending = new Map();
+    this.failedSkies = new Set();
+    this.wind = uniform(0.3);
     this.sky = new SkyMesh();
-    this.sky.scale.setScalar(8000);
-    this.sky.rayleigh.value = 1.6;
-    this.sky.turbidity.value = 4;
-    this.sky.cloudScale.value = 0.0004;
-    this.sky.cloudSpeed.value = 0.00005;
-    this.sky.cloudCoverage.value = 0.28;
+    this.sky.scale.setScalar(7000);
+    this.sky.rayleigh.value = 2;
+    this.sky.turbidity.value = 3;
     scene.add(this.sky);
-    this.sun = new THREE.DirectionalLight(0xffdfaa, 2.5);
+    this.sun = new THREE.DirectionalLight(0xffdfaa, 3);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
-    this.sun.shadow.camera.left = -330;
-    this.sun.shadow.camera.right = 330;
-    this.sun.shadow.camera.top = 330;
-    this.sun.shadow.camera.bottom = -330;
-    this.sun.shadow.camera.near = 1;
-    this.sun.shadow.camera.far = 1800;
-    this.sun.shadow.bias = -0.0003;
-    this.sun.shadow.normalBias = 0.15;
+    Object.assign(this.sun.shadow.camera, {
+      left: -260,
+      right: 260,
+      top: 260,
+      bottom: -260,
+      near: 1,
+      far: 1600,
+    });
+    this.sun.shadow.bias = -0.0001;
+    this.sun.shadow.normalBias = 0.12;
     this.sun.shadow.camera.updateProjectionMatrix();
-    this.sun.target.position.set(0, 45, 150);
+    this.sun.target.position.set(0, 45, 230);
     scene.add(this.sun, this.sun.target);
-    this.hemi = new THREE.HemisphereLight(0xe4efff, 0x888068, 2);
-    this.fill = new THREE.AmbientLight(0xffffff, 0.3);
+    this.hemi = new THREE.HemisphereLight(0xc6ddff, 0x574c3e, 0.24);
+    this.fill = new THREE.AmbientLight(0xdce8ff, 0.025);
     scene.add(this.hemi, this.fill);
-    scene.fog = new THREE.FogExp2(0xc7c7b1, 0.0006);
+    scene.fog = new THREE.FogExp2(0xafc5cf, 0.0005);
     const floor = new THREE.Mesh(
       new THREE.CircleGeometry(4500, 64).rotateX(-Math.PI / 2),
-      new THREE.MeshStandardNodeMaterial({ color: 0x78816b, roughness: 1 }),
+      new THREE.MeshStandardNodeMaterial({ color: 0x414a3d, roughness: 1 }),
     );
-    floor.position.y = 0;
     scene.add(floor);
-    // Coarse environment reflection generated once; lighting and sky animate independently.
     this.envGenerator = new THREE.PMREMGenerator(renderer);
-    this.stars = this.makeStars();
-    scene.add(this.stars);
   }
-  makeStars() {
-    let data = new Float32Array(1300 * 3);
-    for (let i = 0; i < 1300; i++) {
-      const a = i * 2.3999632297,
-        y = 0.1 + ((i * 137) % 1300) / 1500,
-        r = Math.sqrt(1 - y * y);
-      data.set(
-        [Math.cos(a) * r * 3500, y * 3500, Math.sin(a) * r * 3500],
-        i * 3,
-      );
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(data, 3));
-    return new THREE.Points(
-      g,
-      new THREE.PointsMaterial({
-        color: 0xdce8ff,
-        size: 2.4,
-        sizeAttenuation: false,
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
+  async loadSurfaces(base) {
+    const loader = new THREE.TextureLoader();
+    this.surfaces = await Promise.all(
+      ["color", "height", "roughness"].map(async (name) => {
+        const t = await loader.loadAsync(
+          base + "textures/pbr/asphalt-" + name + ".jpg",
+        );
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.anisotropy = 16;
+        if (name === "color") t.colorSpace = THREE.SRGBColorSpace;
+        return t;
       }),
     );
   }
+  async loadSky(key) {
+    if (this.skies.has(key)) return this.skies.get(key);
+    if (this.pending.has(key)) return this.pending.get(key);
+    const pending = (async () => {
+      const hdr = await new HDRLoader().loadAsync(
+        import.meta.env.BASE_URL + "skies/" + SKY_FILES[key] + ".hdr",
+      );
+      hdr.mapping = THREE.EquirectangularReflectionMapping;
+      const env = this.envGenerator.fromEquirectangular(hdr);
+      const value = { hdr, env };
+      this.skies.set(key, value);
+      return value;
+    })();
+    this.pending.set(key, pending);
+    try {
+      return await pending;
+    } finally {
+      this.pending.delete(key);
+    }
+  }
   async environment() {
-    const s = new THREE.Scene();
-    const clone = new SkyMesh();
-    clone.scale.setScalar(8000);
-    clone.sunPosition.value.copy(this.sky.sunPosition.value);
-    clone.showSunDisc.value = 0;
-    clone.cloudCoverage.value = 0.35;
-    s.add(clone);
-    this.env = this.envGenerator.fromScene(s, 0.03, 0.1, 10000);
-    this.scene.environment = this.env.texture;
-    clone.geometry.dispose();
-    clone.material.dispose();
+    await this.loadSky(this.desiredSky ?? "golden");
+    this.applySky();
+  }
+  applySky() {
+    const value = this.skies.get(this.desiredSky);
+    if (!value || this.currentSky === this.desiredSky) return;
+    this.currentSky = this.desiredSky;
+    this.scene.background = value.hdr;
+    this.scene.environment = value.env.texture;
+    this.scene.backgroundBlurriness = 0;
+    this.sky.visible = false;
+  }
+  foliage(source) {
+    const m = source.clone();
+    m.name = "Foliage";
+    m.emissiveNode = null;
+    m.roughnessNode = float(0.94);
+    m.clearcoatNode = float(0);
+    m.normalNode = null;
+    const crown = smoothstep(45, 76, positionLocal.y);
+    const sway = sin(this.t.mul(1.1).add(positionLocal.z.mul(0.12)))
+      .mul(0.22)
+      .add(sin(this.t.mul(2.8).add(positionLocal.x.mul(0.5))).mul(0.055));
+    m.positionNode = positionLocal.add(
+      vec3(
+        sway.mul(crown).mul(this.wind),
+        0,
+        sway.mul(crown).mul(0.4).mul(this.wind),
+      ),
+    );
+    return m;
   }
   material(name, map, roughnessMap) {
-    const road = name === "Road texture",
-      m = new THREE.MeshPhysicalNodeMaterial({
-        map,
-        roughnessMap: roughnessMap ?? null,
-        roughness: road ? 0.85 : 0.93,
-        metalness: 0,
-        side: THREE.DoubleSide,
-        alphaTest: road ? 0 : 0.5,
-        clearcoat: 0,
-        emissiveMap: map,
-        emissive: 0xffd1a0,
-        emissiveIntensity: 0.06,
-      });
+    const road = name === "Road texture";
+    const m = new THREE.MeshPhysicalNodeMaterial({
+      map,
+      roughness: 0.9,
+      metalness: 0,
+      side: THREE.DoubleSide,
+      alphaTest: road ? 0 : 0.5,
+      clearcoat: 0,
+    });
     m.name = name;
-    // Wet horizontal surfaces darken and become specular. Fragment world-space
-    // noise keeps puddle edges stable as the camera moves (no screen-space swimming).
+    const base = texture(map);
+    const horizontal = smoothstep(0.78, 0.98, normalWorld.y);
+    // Shallow, irregular pools; sharp highlights sit on a nearly flat water film.
     const patch = smoothstep(
-      -0.12,
-      0.34,
-      mx_noise_float(positionWorld.xz.mul(0.1)),
+      0.14,
+      0.48,
+      mx_noise_float(positionWorld.xz.mul(0.09))
+        .mul(0.7)
+        .add(mx_noise_float(positionWorld.xz.mul(0.41)).mul(0.3)),
     );
-    const horizontal = smoothstep(0.72, 0.95, normalWorld.y.abs());
     const wet = this.wet.mul(horizontal).mul(patch);
-    m.roughnessNode = mix(float(0.9), float(0.13), wet);
-    if (road)
-      m.normalNode = bumpMap(
-        sin(positionWorld.x.mul(5).add(this.t.mul(9)))
-          .mul(cos(positionWorld.z.mul(6).sub(this.t.mul(7))))
-          .mul(wet)
-          .mul(0.025),
+    const dryRough = roughnessMap
+      ? texture(roughnessMap).g.mul(0.75).add(0.18)
+      : float(0.9);
+    m.roughnessNode = mix(dryRough, float(0.18), wet);
+    m.clearcoatNode = wet.mul(0.38);
+    m.clearcoatRoughnessNode = float(0.06);
+    m.opacityNode = base.a;
+    if (roughnessMap && name !== "Environment") {
+      const glass = float(1).sub(
+        smoothstep(0.07, 0.24, texture(roughnessMap).g),
       );
-    m.clearcoatNode = wet.mul(0.8);
-    m.clearcoatRoughnessNode = float(0.12);
-    m.opacityNode = texture(map).a;
-    m.colorNode = texture(map).rgb.mul(float(1).sub(wet.mul(0.22)));
+      m.emissiveNode = base.rgb
+        .mul(vec3(0.8, 0.62, 0.38))
+        .mul(glass)
+        .mul(this.windowLight);
+    }
+    m.colorNode = base.rgb.mul(float(1).sub(wet.mul(0.4)));
+    if (road && this.surfaces) {
+      const tiled = positionWorld.xz.mul(0.22);
+      const grain = texture(this.surfaces[0], tiled).rgb;
+      // Keep the authored lane paint and geography, add real aggregate at foot scale.
+      m.colorNode = base.rgb
+        .mul(grain.mul(2.5).add(0.48))
+        .mul(float(1).sub(wet.mul(0.38)));
+      m.roughnessNode = mix(
+        texture(this.surfaces[2], tiled).r.mul(0.25).add(0.7),
+        float(0.13),
+        wet,
+      );
+      m.normalNode = bumpMap(
+        texture(this.surfaces[1], tiled)
+          .r.mul(float(1).sub(wet.mul(0.96)))
+          .mul(0.065),
+      );
+    } else {
+      // Very fine masonry relief: deliberately below the scale of facade graphics.
+      m.normalNode = bumpMap(mx_noise_float(positionWorld.mul(5)).mul(0.009));
+    }
     this.materials.push(m);
     return m;
   }
   update(dt, s, elapsed) {
     this.t.value = elapsed;
-    this.wet.value = THREE.MathUtils.damp(this.wet.value, s.rain, 0.22, dt);
-    const theta = ((s.hour - 6) / 12) * Math.PI,
-      alt = Math.sin(theta),
-      day = THREE.MathUtils.smoothstep(alt, -0.13, 0.15),
-      warm = 1 - THREE.MathUtils.smoothstep(alt, 0, 0.5);
+    this.wind.value = (this.motion ?? 1) * (0.6 + s.rain * 2);
+    this.wet.value = THREE.MathUtils.damp(this.wet.value, s.rain, 0.65, dt);
+    this.desiredSky = skyForHour(s.hour, s.rain);
+    if (
+      !this.skies.has(this.desiredSky) &&
+      !this.pending.has(this.desiredSky) &&
+      !this.failedSkies.has(this.desiredSky) &&
+      this.currentSky
+    ) {
+      this.loadSky(this.desiredSky)
+        .then(() => this.applySky())
+        .catch((error) => {
+          this.failedSkies.add(this.desiredSky);
+          console.warn(
+            "Sky unavailable; retaining current lighting",
+            error.message,
+          );
+        });
+    }
+    this.applySky();
+    const theta = ((s.hour - 6) / 12) * Math.PI;
+    const alt = Math.sin(theta);
+    const day = THREE.MathUtils.smoothstep(alt, -0.18, 0.15);
+    const warm = 1 - THREE.MathUtils.smoothstep(alt, 0.05, 0.55);
+    const night = 1 - day;
+    // Match the azimuth of the captured sun to the actual directional light.
+    const azimuth = 0.6289;
     const dir = new THREE.Vector3(
-      -Math.cos(theta) * 0.85,
-      alt,
-      Math.cos(theta) * 0.5,
+      Math.cos(azimuth),
+      Math.max(0.06, alt),
+      Math.sin(azimuth),
     ).normalize();
     this.sky.sunPosition.value.copy(dir).multiplyScalar(4000);
-    this.sky.visible = day > 0.03;
-    this.sky.cloudCoverage.value = 0.28 + s.rain * 0.64;
-    this.sky.cloudDensity.value = 0.35 + s.rain * 0.5;
-    this.sky.turbidity.value = 3.5 + s.haze * 5 + s.rain * 6;
-    this.sun.position.copy(this.sun.target.position).addScaledVector(dir, 850);
-    this.sun.intensity = day * (2.1 + warm * 0.4) * (1 - s.rain * 0.84);
-    this.sun.color.set(0xfff4dc).lerp(new THREE.Color(0xffae66), warm * 0.6);
-    this.hemi.intensity = 0.24 + day * 1.65;
-    this.fill.intensity = 0.14 + day * 0.3;
-    this.hemi.color.set(0xaecbdf).lerp(new THREE.Color(0xffdfac), warm * 0.35);
-    this.scene.background = new THREE.Color(0x0b1425);
-    this.scene.environmentIntensity = 0.17 + day * 0.65;
-    const fog = new THREE.Color(0xc5c9b8)
-      .lerp(new THREE.Color(0xd9b18a), warm * 0.6)
-      .lerp(new THREE.Color(0x8cabae), s.rain * 0.75)
-      .lerp(new THREE.Color(0x182739), 1 - day);
+    this.sun.position.copy(this.sun.target.position).addScaledVector(dir, 700);
+    this.sun.intensity = day * (3.2 - warm * 0.8) * (1 - s.rain * 0.96);
+    this.sun.color.set(0xfff5e3).lerp(new THREE.Color(0xffb363), warm * 0.8);
+    this.hemi.intensity = 0.06 + day * 0.23;
+    this.fill.intensity = 0.012 + night * 0.008;
+    this.scene.environmentIntensity =
+      (0.5 - s.rain * 0.22) * day + night * 0.12;
+    // Night HDRs are exposed photographs: keep their radiance below the streetlights.
+    this.scene.backgroundIntensity =
+      this.desiredSky === "night"
+        ? 0.008
+        : this.desiredSky === "blue"
+          ? 0.2
+          : 0.8;
+    const fog = new THREE.Color(0xb2c6d5)
+      .lerp(new THREE.Color(0xd3ad86), warm * 0.65)
+      .lerp(new THREE.Color(0x778d9f), s.rain)
+      .lerp(new THREE.Color(0x101d32), night);
     this.scene.fog.color.copy(fog);
-    this.scene.fog.density = 0.00022 + s.haze * 0.00065 + s.rain * 0.0011;
-    this.stars.material.opacity = (1 - day) * (1 - s.rain);
-    this.stars.visible = day < 0.95;
-    for (const m of this.materials)
-      m.emissiveIntensity = 0.015 + (1 - day) * 0.19;
-    this.renderer.toneMappingExposure = s.exposure * (0.95 + (1 - day) * 0.25);
-    this.night = 1 - day;
-    return this.night;
+    this.scene.fog.density = 0.00013 + s.haze * 0.00048 + s.rain * 0.00065;
+    this.renderer.toneMappingExposure = s.exposure * (1.03 + night * 0.17);
+    this.windowLight.value = night * 0.7;
+    this.night = night;
+    return night;
   }
 }

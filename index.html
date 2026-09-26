@@ -27,8 +27,8 @@
           class="brand"
           href="https://thomasdlynn.dev"
           aria-label="Thomas D. Lynn portfolio"
-          ><span class="brand-mark">H.</span
-          ><span>HLEDAN<span class="brand-sub">A YANGON MEMORY</span></span></a
+          ><span class="brand-mark" lang="my">လှည်းတန်း</span
+          ><span>HLEDAN<span class="brand-sub">YANGON · MYANMAR</span></span></a
         >
         <nav class="top-actions">
           <span id="backend" class="status"><i></i>CONNECTING</span
@@ -45,7 +45,7 @@
         </nav>
       </header>
       <div class="location">
-        <span class="live-dot"></span> LIVE WORLD
+        <span class="live-dot"></span> 16.827° N / 96.128° E
         <span class="separator">/</span><span id="clock">17:15</span
         ><span id="weather-label">GOLDEN HOUR</span>
       </div>
@@ -59,7 +59,7 @@
           <span class="eyebrow">MAKE IT YOUR MOMENT</span
           ><button id="close-settings" aria-label="Close settings">×</button>
         </div>
-        <h2>Atmosphere & graphics</h2>
+        <h2>Make it your moment</h2>
         <label
           >Quality
           <select id="quality">
@@ -110,6 +110,9 @@
         ><label class="check"
           >Ambient occlusion <input id="ao" type="checkbox" checked /></label
         ><label class="check"
+          >Wet-surface reflections
+          <input id="reflections" type="checkbox" checked /></label
+        ><label class="check"
           >Moving traffic <input id="traffic" type="checkbox" checked /></label
         ><label class="check"
           >Adaptive resolution
@@ -122,35 +125,30 @@
         <p class="panel-note" id="performance">Preparing renderer…</p>
       </section>
       <section class="intro">
-        <div class="eyebrow">
-          16.827° N &nbsp; 96.128° E <span class="intro-line"></span> YANGON,
-          MYANMAR
-        </div>
-        <h1>Hledan<span class="burmese" lang="my">လှည်းတန်း</span></h1>
-        <p>
-          The last light on the flyover. The clink of a tea glass.<br />A
-          familiar corner of a city that never quite leaves you.
-        </p>
+        <div class="eyebrow">A LITTLE CLOSER TO HOME</div>
+        <h1>The streets<br />stay with you.</h1>
+        <p>Hledan Junction. A living memory of Yangon.</p>
         <div class="intro-actions">
           <button id="enter" class="primary">
-            Walk these streets <span>↗</span></button
-          ><button id="tour" class="text-button">
-            Take the slow way <span>▶</span>
-          </button>
+            Step into Hledan <span>↗</span></button
+          ><button id="tour" class="text-button">Take the slow way ▶</button>
         </div>
       </section>
-      <aside class="places">
-        <span class="eyebrow">FIND YOUR WAY</span
-        ><button data-place="junction" class="selected">
-          <span>01</span> The junction <b>↗</b></button
-        ><button data-place="flyover">
-          <span>02</span> Above the flyover <b>↗</b></button
-        ><button data-place="tea">
-          <span>03</span> A cup of laphet yay <b>↗</b></button
-        ><button data-place="centre">
-          <span>04</span> Hledan Centre <b>↗</b>
-        </button>
-      </aside>
+      <details class="places">
+        <summary>Explore the neighbourhood <span>＋</span></summary>
+        <div class="places-list">
+          <span class="eyebrow">FIND YOUR WAY</span
+          ><button data-place="junction">
+            <span>01</span> The junction <b>↗</b></button
+          ><button data-place="flyover">
+            <span>02</span> Above the flyover <b>↗</b></button
+          ><button data-place="tea">
+            <span>03</span> A cup of laphet yay <b>↗</b></button
+          ><button data-place="centre" class="selected">
+            <span>04</span> Hledan Centre <b>↗</b>
+          </button>
+        </div>
+      </details>
       <div id="walk-hint" hidden>
         <span class="crosshair">+</span>
         <div class="walk-caption">
@@ -173,9 +171,11 @@
           aria-label="Atmosphere presets"
         >
           <button data-weather="dawn">◔ <span>Dawn</span></button
+          ><button data-weather="clear">☀ <span>Clear skies</span></button
           ><button data-weather="golden" class="active">
             ☀ <span>Golden hour</span></button
           ><button data-weather="monsoon">☂ <span>Monsoon</span></button
+          ><button data-weather="blue">◒ <span>Blue hour</span></button
           ><button data-weather="night">☾ <span>After dark</span></button>
         </div>
         <button id="photo" title="Photo mode (P)">
@@ -214,7 +214,9 @@
       </p>
       <h3>Made with, and inspired by</h3>
       <p>
-        Three.js WebGPU & TSL. Rendering research: Dan Greenheck’s
+        Three.js WebGPU & TSL. HDR skies and asphalt by
+        <a href="https://polyhaven.com">Poly Haven</a> (CC0). Rendering
+        research: Dan Greenheck’s
         <a href="https://github.com/dgreenheck/tidewater">Tidewater</a>,
         <a href="https://github.com/dgreenheck/webgpu-claude-skill"
           >WebGPU skill</a

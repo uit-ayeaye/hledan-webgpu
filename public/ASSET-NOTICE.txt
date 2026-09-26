@@ -4,7 +4,7 @@ Hledan Junction — third-party assets
 Vehicle models
 --------------
 
-showcase/hledan/models/vehicles/bus-poly.glb
+models/vehicles/bus-poly.glb
   "Bus" by Poly by Google
   Source:  https://poly.pizza/m/4CPpvEmrMoF
   Licence: Creative Commons Attribution (CC-BY 3.0)
@@ -12,7 +12,7 @@ showcase/hledan/models/vehicles/bus-poly.glb
   ATTRIBUTION IS REQUIRED for this asset and is given here and in the
   page's info panel. Do not remove either without also removing the model.
 
-showcase/hledan/models/vehicles/car-quaternius.glb
+models/vehicles/car-quaternius.glb
   "Car" by Quaternius
   Source:  https://poly.pizza/m/unqqkULtRU
   Licence: Public Domain (CC0 1.0)
@@ -23,10 +23,39 @@ Both were downloaded from Poly Pizza (https://poly.pizza) and are used
 unmodified except for normalisation performed at load time: each is scaled
 per-axis to its real-world dimensions (bus 2.50 x 3.20 x 11.5 m, car
 1.78 x 1.52 x 4.40 m), centred, and dropped onto the ground plane. See
-assets/props.js -> loadVehicleGeometry.
+src/legacy/props.js -> loadVehicleGeometry.
 
-Everything else on this page — the street furniture, the tea shops, the
+The original street furniture on this page — the street furniture, the tea shops, the
 water-pot stands, the poles and cables, the lighting and the soundscape —
 is generated procedurally in this repository and carries no third-party
 licence. The map itself (models/hledan.glb) and the character models are
 covered by the showcase's own terms.
+
+
+Rendering rebuild — Poly Haven assets (CC0 1.0)
+------------------------------------------------
+https://polyhaven.com/license
+https://creativecommons.org/publicdomain/zero/1.0/
+
+HDR panoramas, 2K Radiance HDR, downloaded September 26, 2026:
+https://polyhaven.com/a/qwantani_sunrise_puresky
+https://polyhaven.com/a/qwantani_sunset_puresky
+https://polyhaven.com/a/qwantani_noon_puresky
+https://polyhaven.com/a/qwantani_dusk_2_puresky
+https://polyhaven.com/a/qwantani_night_puresky
+  Qwantani photography: Greg Zaal; processing: Jarod Guest.
+https://polyhaven.com/a/kloofendal_overcast_puresky
+  Greg Zaal.
+
+https://polyhaven.com/a/asphalt_02
+  Asphalt 02: 1K diffuse, displacement and roughness JPG maps.
+  Used as tiled road detail with the original Hledan road albedo.
+
+These skies are atmosphere references photographed outside Yangon. They do
+not depict a claimed geographical capture of Hledan's sky or terrain.
+
+Original map textures
+---------------------
+4K Building_Base, Environment_Base, Hledan_Centre and corresponding roughness
+maps from Thomas's original HLEDAN HIGH POLY Unity package. Transcoded to WebP.
+They retain the original map's rights and are not relicensed as CC0.

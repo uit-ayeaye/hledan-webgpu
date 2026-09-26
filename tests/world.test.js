@@ -156,3 +156,45 @@ test("walking gravity settles on the road, jumps and lands without changing floo
     globalThis.window = savedWindow;
   }
 });
+
+test("weather boundaries select daylight, storm and night skies consistently", async () => {
+  const { skyForHour, PRESETS } = await import("../src/settings.js");
+  for (const [key, preset] of Object.entries(PRESETS)) {
+    assert.equal(skyForHour(preset.hour, preset.rain), key);
+  }
+  assert.equal(
+    skyForHour(23, 1),
+    "night",
+    "rain must not make a midnight sky daylight",
+  );
+  assert.equal(skyForHour(12, 1), "monsoon");
+  assert.equal(skyForHour(24, 0), "night");
+  assert.equal(sanitizeSettings({ reflections: false }).reflections, false);
+});
+
+test("all six HDR skies and restored 4K material maps are shipped", () => {
+  for (const name of [
+    "qwantani_sunrise_puresky",
+    "qwantani_sunset_puresky",
+    "qwantani_noon_puresky",
+    "qwantani_dusk_2_puresky",
+    "qwantani_night_puresky",
+    "kloofendal_overcast_puresky",
+  ]) {
+    const b = readFileSync(
+      new URL(`../public/skies/${name}.hdr`, import.meta.url),
+    );
+    assert.match(b.subarray(0, 500).toString(), /FORMAT=32-bit_rle_rgbe/);
+    assert.match(b.subarray(0, 500).toString(), /-Y 1024 \+X 2048/);
+  }
+  for (const name of [
+    "building_roughness",
+    "environment_roughness",
+    "hledan_roughness",
+  ]) {
+    const b = readFileSync(
+      new URL(`../public/textures/hi/${name}.webp`, import.meta.url),
+    );
+    assert.equal(b.subarray(8, 12).toString(), "WEBP");
+  }
+});

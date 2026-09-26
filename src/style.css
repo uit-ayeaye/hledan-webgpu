@@ -671,3 +671,344 @@ dialog a {
     transition: none !important;
   }
 }
+/* Hledan / cinematic desktop edition. The city owns the centre of the frame. */
+:root {
+  --gold: #e5c595;
+  --line: #ffffff20;
+  background: #111820;
+}
+#ui {
+  background: linear-gradient(
+    180deg,
+    #08101b60 0%,
+    transparent 18%,
+    transparent 62%,
+    #071019a0 100%
+  );
+}
+header {
+  top: 26px;
+  left: 30px;
+  right: 30px;
+}
+.brand {
+  gap: 16px;
+  font-size: 12px;
+  letter-spacing: 0.28em;
+  text-shadow: 0 2px 18px #0008;
+}
+.brand-mark {
+  width: auto;
+  height: auto;
+  padding: 0 15px 0 0;
+  border: 0;
+  border-right: 1px solid #ffffff40;
+  border-radius: 0;
+  font:
+    22px/1.8 "Noto Sans Myanmar",
+    sans-serif;
+  letter-spacing: 0;
+  color: #f3eee3;
+}
+.brand-sub {
+  font-size: 7px;
+  letter-spacing: 0.2em;
+  margin-top: 6px;
+}
+.top-actions button {
+  border-radius: 24px;
+  background: #11192355;
+  backdrop-filter: blur(16px);
+  height: 34px;
+  font-size: 10px;
+  padding: 0 13px;
+}
+.status {
+  font-size: 7px;
+  opacity: 0.65;
+}
+.location {
+  left: 31px;
+  top: 89px;
+  font-size: 8px;
+  gap: 10px;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 10px #000;
+}
+#weather-label {
+  color: #faf3e7;
+}
+.intro {
+  left: 38px;
+  bottom: 151px;
+  max-width: 380px;
+}
+.intro h1 {
+  font:
+    400 clamp(38px, 4vw, 64px) / 1.06 Georgia,
+    serif;
+  letter-spacing: -0.045em;
+  margin: 14px 0 13px;
+  text-shadow: 0 3px 35px #0006;
+}
+.intro .eyebrow {
+  font-size: 7px;
+  letter-spacing: 0.22em;
+}
+.intro p {
+  font-size: 10px;
+  margin-bottom: 20px;
+  line-height: 1.6;
+  color: #e8e8e2b5;
+}
+.primary {
+  border-radius: 30px;
+  padding: 12px 18px;
+  font-size: 10px;
+  background: #f1e9d9;
+}
+.primary span {
+  margin-left: 20px;
+}
+.intro-actions {
+  gap: 20px;
+}
+.text-button {
+  font-size: 9px;
+}
+.places {
+  right: 32px;
+  bottom: 153px;
+  width: 224px;
+  pointer-events: auto;
+  border-radius: 8px;
+  background: #0a121c85;
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--line);
+}
+.places summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 15px 16px;
+  font-size: 10px;
+}
+.places summary::-webkit-details-marker {
+  display: none;
+}
+.places summary span {
+  float: right;
+  color: var(--gold);
+}
+.places-list {
+  padding: 5px 16px 8px;
+}
+.places .eyebrow {
+  display: none;
+}
+.places button {
+  font-size: 10px;
+  padding: 12px 0;
+}
+footer {
+  left: 30px;
+  right: 30px;
+  bottom: 37px;
+  border: 0;
+  padding: 12px 0;
+  gap: 12px;
+}
+.weather-switch,
+.mode-switch {
+  padding: 4px;
+  background: #0c131dcc;
+  border: 1px solid #ffffff24;
+  border-radius: 30px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 5px 30px #0002;
+  gap: 2px;
+}
+footer button {
+  border-radius: 24px;
+  padding: 10px 11px;
+  font-size: 11px;
+  color: #e0e2e5af;
+}
+footer button span {
+  font-size: 9px;
+  margin-left: 4px;
+}
+footer button.active {
+  color: #292720;
+  background: #ede5d4;
+  outline: none;
+}
+footer button:hover {
+  background: #ffffff10;
+  color: white;
+}
+footer button.active:hover {
+  background: #fff3da;
+  color: #302615;
+}
+#photo {
+  border: 1px solid #ffffff30;
+  background: #0c131dcc;
+  border-radius: 30px;
+  backdrop-filter: blur(20px);
+}
+.bottom-meta {
+  left: 35px;
+  right: 35px;
+  bottom: 19px;
+  font-size: 7px;
+  color: #e3e7ec80;
+}
+.bottom-meta button {
+  font-size: 8px;
+}
+.panel {
+  background: #111a26f5;
+  border: 1px solid #ffffff25;
+  border-radius: 12px;
+  top: 80px;
+  right: 30px;
+}
+.panel h2 {
+  font: 26px Georgia;
+}
+.panel label {
+  color: #dbe1e8;
+}
+.panel select {
+  background: #22303e;
+}
+.panel-note {
+  color: #9fbbca;
+}
+#resume {
+  top: auto;
+  bottom: 136px;
+  font-size: 9px;
+  background: #101820b0;
+  padding: 8px 13px;
+}
+.walk-caption {
+  bottom: 111px;
+  font-size: 8px;
+  opacity: 0.7;
+}
+.crosshair {
+  font-size: 14px;
+  opacity: 0.35;
+}
+#loading {
+  background: radial-gradient(ellipse at 50% 30%, #2c3944, #090f17 80%);
+}
+.loader-mark {
+  color: #e1c9a4;
+  font-size: 32px;
+}
+#loading p,
+#loading small {
+  color: #a7b3be;
+}
+dialog {
+  background: #151e28;
+}
+@media (min-width: 1600px) {
+  .intro {
+    bottom: 158px;
+  }
+  .places {
+    bottom: 156px;
+  }
+}
+@media (max-width: 1100px) {
+  footer button {
+    padding: 10px 8px;
+  }
+  footer button span {
+    font-size: 8px;
+  }
+  .status {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  header {
+    left: 20px;
+    right: 20px;
+  }
+  .brand-mark {
+    font-size: 16px;
+    padding-right: 10px;
+  }
+  .brand {
+    font-size: 10px;
+    gap: 10px;
+  }
+  .location {
+    left: 20px;
+    top: 80px;
+  }
+  .intro {
+    left: 25px;
+    bottom: 180px;
+  }
+  .intro h1 {
+    font-size: 46px;
+  }
+  footer {
+    left: 15px;
+    right: 15px;
+    bottom: 40px;
+    gap: 10px;
+  }
+  .weather-switch {
+    width: auto;
+  }
+  .walk-caption {
+    bottom: 161px;
+  }
+  #resume {
+    bottom: 185px;
+  }
+  .panel {
+    right: 20px;
+  }
+}
+@media (max-width: 540px) {
+  .brand-sub {
+    display: none;
+  }
+  .top-actions button {
+    padding: 0 10px;
+  }
+  #fullscreen {
+    display: none;
+  }
+  .intro h1 {
+    font-size: 40px;
+  }
+  .intro p {
+    max-width: 250px;
+  }
+  .weather-switch {
+    max-width: 100%;
+    overflow: auto;
+  }
+  footer button {
+    padding: 10px 7px;
+  }
+  footer button span {
+    font-size: 8px;
+  }
+  .location {
+    font-size: 6px;
+    gap: 6px;
+  }
+}
+
+.exploring .intro {
+  display: none;
+}

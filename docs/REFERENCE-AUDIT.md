@@ -30,22 +30,22 @@ Its MIT code can be adapted with attribution, but integrating the entire particl
 
 ## Adopted versus deferred
 
-| Reference technique                  | This Hledan release                                                             | Difference / reason                                                    |
-| ------------------------------------ | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Native browser GPU execution         | Three.js WebGPURenderer + TSL                                                   | Real WebGPU, with Three managing resources; not raw WGSL engine parity |
-| Atmospheric sky                      | SkyMesh Preetham atmosphere, sun, procedural clouds, stars                      | Not Hillaire multi-LUT scattering or volumetric cloud ray marching     |
-| HDR post processing                  | GTAO, bloom, FXAA, vignette, exposure, neutral tone mapping                     | No temporal motion vectors, TAAU, motion blur or auto exposure         |
-| Dynamic quality                      | Three quality tiers and adaptive pixel ratio                                    | Targets frame budget; performance depends on hardware and view         |
-| Shadows                              | Directional shadow map, 1024 / 2048 / 4096                                      | Not cascaded contact-hardening sun shadows                             |
-| Wet surfaces                         | Prefiltered environment specular, clearcoat, roughness, procedural road normals | No screen-space building reflections                                   |
-| GPU particles                        | 18k rain drops + 900 surface ripple quads                                       | Height-field collisions; no pressure/XPBD fluid volume                 |
-| First-person movement                | Gravity, jumping, wall collision, step-up, floor/ceiling separation             | No swimming, boat walking or crouching                                 |
-| Moving vehicles                      | Measured two-lane flyover route and pedestrian braking                          | Kinematic, not drivable rigid-body vehicles                            |
-| Environmental audio                  | Synthesized traffic, horns, cups, birds, rain, footsteps                        | No claimed Yangon field recordings                                     |
-| Photo / settings / saved preferences | Implemented                                                                     | Settings persist locally; photo exports the rendered canvas            |
-| GLB and local assets                 | Original Hledan plus attributed vehicle models                                  | No Tidewater island, Rocketbox characters or ocean assets bundled      |
-| Shipping                             | Vite + GitHub Actions + GitHub Pages                                            | Standalone repository, same class of static hosting                    |
-| World scale                          | Hledan only                                                                     | Other Yangon districts need separately sourced/authored maps           |
+| Reference technique                  | This Hledan release                                                    | Difference / reason                                                    |
+| ------------------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Native browser GPU execution         | Three.js WebGPURenderer + TSL                                          | Real WebGPU, with Three managing resources; not raw WGSL engine parity |
+| Atmospheric sky                      | Six HDR sky panoramas with matching PMREM lighting                     | Not Hillaire multi-LUT scattering or volumetric cloud ray marching     |
+| HDR post processing                  | GTAO / Ultra SSGI, SSR, velocity MRT, TRAA, bloom, AgX                 | No motion blur or automatic exposure                                   |
+| Dynamic quality                      | Three quality tiers and adaptive pixel ratio                           | Targets frame budget; performance depends on hardware and view         |
+| Shadows                              | Directional shadow map, 1024 / 2048 / 4096                             | Not cascaded contact-hardening sun shadows                             |
+| Wet surfaces                         | SSR, per-weather HDR specular, authored roughness, real asphalt relief | Screen-space visibility limits; no planar or hardware ray tracing      |
+| GPU particles                        | 18k rain drops + 900 surface ripple quads                              | Height-field collisions; no pressure/XPBD fluid volume                 |
+| First-person movement                | Gravity, jumping, wall collision, step-up, floor/ceiling separation    | No swimming, boat walking or crouching                                 |
+| Moving vehicles                      | Measured two-lane flyover route and pedestrian braking                 | Kinematic, not drivable rigid-body vehicles                            |
+| Environmental audio                  | Synthesized traffic, horns, cups, birds, rain, footsteps               | No claimed Yangon field recordings                                     |
+| Photo / settings / saved preferences | Implemented                                                            | Settings persist locally; photo exports the rendered canvas            |
+| GLB and local assets                 | Original Hledan plus attributed vehicle models                         | No Tidewater island, Rocketbox characters or ocean assets bundled      |
+| Shipping                             | Vite + GitHub Actions + GitHub Pages                                   | Standalone repository, same class of static hosting                    |
+| World scale                          | Hledan only                                                            | Other Yangon districts need separately sourced/authored maps           |
 
 ## Existing-map constraints
 
@@ -53,10 +53,10 @@ The authored map contains roughly 59.5k triangles merged into a small number of 
 
 ## Further work needed for reference-level fidelity
 
-1. Replace/author close-range building facades, interiors, road surface normals and tropical trees, using reference photography with appropriate rights.
+1. Replace/author close-range building facades, interiors, additional street-scale detail and tropical trees, using reference photography with appropriate rights.
 2. Capture or license actual Hledan ambience and accurately placed landmarks; curate Burmese shop names with local review.
 3. Introduce mesh LODs, district streaming and verified geographic alignment before expanding across Yangon.
-4. Add temporal history/motion vectors and screen-space or planar reflections with measured memory budgets.
+4. Extend current temporal reconstruction / screen-space reflections to off-screen geometry and more robust disocclusion handling.
 5. Integrate rigid-body vehicle controls and navigation for pedestrians as separately tested systems.
 6. Add an optional fluid/cloth experiment only after checking adapter limits and keeping a broadly compatible default.
 
