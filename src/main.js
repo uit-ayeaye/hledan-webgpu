@@ -30,7 +30,7 @@ const PLACES={
 };
 function toast(text){$('toast').textContent=text;$('toast').hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').hidden=true,4500);}
 function progress(value,text){$('progress').style.width=value+'%';$('load-message').textContent=text;}
-function fail(error){console.error(error);running=false;$('loading').classList.remove('done');$('load-message').textContent='The 3D world could not start. '+error.message;const link=document.createElement('a');link.textContent='Open the original Hledan experience ↗';link.href='https://thomasdlynn.dev/showcase/hledan/';link.className='primary';$('loading').append(link);}
+function fail(error){console.error(error);running=false;$('loading').hidden=false;$('loading').removeAttribute('aria-hidden');$('loading').classList.remove('done');$('load-message').textContent='The 3D world could not start. '+error.message;const link=document.createElement('a');link.textContent='Open the original Hledan experience ↗';link.href='https://thomasdlynn.dev/showcase/hledan/';link.className='primary';$('loading').append(link);}
 function resize(){if(!renderer)return;const cap=settings.quality==='ultra'?2:settings.quality==='high'?1.5:1;renderer.setPixelRatio(Math.min(devicePixelRatio,cap)*scale);renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}
 function syncUI(){
   for(const id of ['quality','rain','haze','exposure'])$(id).value=settings[id];$('time').value=settings.hour;
@@ -90,7 +90,7 @@ function bindUI(){
 
 async function start(){
   progress(5,'Waking up the graphics engine…');
-  renderer=new THREE.WebGPURenderer({canvas:$('world'),antialias:true,powerPreference:'high-performance'});
+  renderer=new THREE.WebGPURenderer({canvas:$('world'),antialias:true,powerPreference:'high-performance',forceWebGL:new URLSearchParams(location.search).has('compat')});
   await renderer.init();const gpu=renderer.backend.isWebGPUBackend;
   $('backend').innerHTML=`<i></i>${gpu?'WEBGPU':'WEBGL2 COMPATIBILITY'}`;
   renderer.toneMapping=THREE.NeutralToneMapping;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -125,7 +125,7 @@ async function start(){
   progress(88,'Catching the light — compiling shaders…');
   await renderer.compileAsync(scene,camera);
   pipeline.render();
-  progress(100,'You are here.');ready=true;$('loading').classList.add('done');
+  progress(100,'You are here.');ready=true;$('loading').classList.add('done');$('loading').setAttribute('aria-hidden','true');setTimeout(()=>$('loading').hidden=true,800);
   // Read-only diagnostics intentionally exported for reproducible browser QA.
   window.__HLEDAN__={get state(){return {ready,backend:gpu?'webgpu':'webgl2',mode:explorer.mode,position:camera.position.toArray(),settings:{...settings},fps:Math.round(1000/frameMs),scale,rainParticles:rain?.count??0,triangles:renderer.info.render.triangles,drawCalls:renderer.info.render.drawCalls,traffic:traffic.cars.length,collisionTriangles:solids.tris.length/9};}};
   renderer.setAnimationLoop(frame);

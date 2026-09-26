@@ -11,7 +11,7 @@ export function sanitizeSettings(data) {
   for(const [key,min,max] of [['hour',0,24],['rain',0,1],['haze',0,1],['exposure',0.4,1.6]]) if(Number.isFinite(data[key])) s[key]=Math.max(min,Math.min(max,data[key]));
   for(const key of ['bloom','ao','traffic','adaptive','daycycle']) if(typeof data[key]==='boolean') s[key]=data[key];
   if(['balanced','high','ultra'].includes(data.quality)) s.quality=data.quality;
-  if(data.preset in PRESETS) s.preset=data.preset;
+  if(typeof data.preset==='string'&&Object.hasOwn(PRESETS,data.preset)) s.preset=data.preset;
   return s;
 }
 export function loadSettings() {try {return sanitizeSettings(JSON.parse(localStorage.getItem('hledan-settings-v1')));} catch{return {...DEFAULTS};}}

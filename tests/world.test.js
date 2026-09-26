@@ -35,3 +35,14 @@ test('Hledan GLB and all required high-resolution textures ship locally',()=>{
  const names=json.materials.map(x=>x.name);for(const name of ['Building','Hledan_Center','Environment','Road texture'])assert.ok(names.includes(name));
  for(const file of ['hi/building_basecolor.webp','hi/hledan_basecolor.webp','hi/environment_basecolor.webp','road_basecolor.webp'])assert.ok(existsSync(new URL('../public/textures/'+file,import.meta.url)));
 });
+
+const {Traffic}=await import('../src/traffic.js');
+test('moving traffic retains lane spacing and stops for a pedestrian ahead',()=>{
+ const scene=new THREE.Scene(),t=new Traffic(scene);const loaded={geometry:new THREE.BoxGeometry(2,2,4),material:new THREE.MeshStandardMaterial()};
+ t.add(loaded,'car');t.add(loaded,'bus');t.update(0,true);
+ const car=t.cars[0],before=car.u,p=car.mesh.position.clone();p.x+=Math.sin(car.mesh.rotation.y)*10;p.z+=Math.cos(car.mesh.rotation.y)*10;p.y+=2;
+ t.update(1/60,true,p);assert.equal(car.u,before);
+ for(let i=0;i<3600;i++)t.update(1/60,true);
+ for(const a of t.cars)for(const b of t.cars)if(a!==b&&a.dir===b.dir)assert.ok(((b.u-a.u)*a.dir+1)%1*t.length>24);
+ assert.ok(t.blocked(car.mesh.position.x,car.mesh.position.z,.5,car.mesh.position.y));
+});
