@@ -8,7 +8,7 @@
 - High: GTAO, SSR and TRAA observed running; roughly 39–44 FPS at adaptive 60% in the tested street view. Ultra after half-resolution GI: roughly 47–60 FPS at adaptive 67–84% in the tested views. These observations used different views/window sizes and are not a controlled cross-tier benchmark or a hardware guarantee.
 - Ultra's initial five-attachment configuration exceeded the device's baseline attachment budget. Fixed by packing roughness with encoded normals, retaining at most four attachments. Retested cleanly after fixing.
 - Tested desktop HUD, settings, six themes, keyboard activation, orbit, walk/jump, and photo mode. Save photograph reached successful canvas conversion and the download action; a new downloaded file was not independently located during this pass, so end-to-end file delivery is not claimed here.
-- The previous version's walk/collision tests remain passing. Compatibility rendering was tested in version 1; version 2's new HDR/material fallback needs a separate WebGL2 browser check if used as a deployment target.
+- Forced WebGL2 compatibility (`?compat&moment=monsoon`) rendered the new HDR sky and materials without warning/error logs. Observed approximately 40 FPS at full render scale in the tested view. GPU rain, SSR, SSGI and TRAA correctly report disabled; GTAO/FXAA remain active. The previous version's walk/collision tests remain passing.
 
 ## Visual corrections made during browser review
 
